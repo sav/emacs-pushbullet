@@ -1,0 +1,176 @@
+#+TITLE: emacs-pushbullet
+
+A comprehensive Pushbullet client for GNU Emacs that allows you to send and manage pushes directly from your editor.
+
+* Features
+
+- Send Notes: Send text notes to Pushbullet with custom titles
+- Region Pushing: Push selected text regions to your devices
+- Clipboard Integration: Send clipboard contents to Pushbullet
+- Interactive UI: Browse and manage your pushes in a dedicated Emacs buffer
+- Modern Interface: Beautiful formatting with icons and proper typography
+- Pagination Support: Load multiple pages of pushes efficiently
+
+* Installation
+
+** Manual Installation
+
+1. Clone this repository:
+   #+BEGIN_SRC bash
+   git clone https://github.com/sav/emacs-pushbullet.git
+   #+END_SRC
+
+2. Add the following to your =~/.emacs.d/init.el=:
+   #+BEGIN_SRC elisp
+   (add-to-list 'load-path "~/path/to/emacs-pushbullet")
+   (require 'pushbullet)
+   #+END_SRC
+
+** Using straight.el
+
+#+BEGIN_SRC elisp
+(use-package pushbullet
+  :straight (:type git :host github :repo "sav/emacs-pushbullet"))
+#+END_SRC
+
+** Using Doom Emacs
+
+#+BEGIN_SRC elisp
+(package! pushbullet :recipe (:host github :repo "sav/emacs-pushbullet"))
+#+END_SRC
+
+* Configuration
+
+** Required Setup
+
+1. Get your Pushbullet API token:
+   - Go to https://www.pushbullet.com/#settings/account
+   - Copy your "Access Token"
+
+2. Configure the token in Emacs:
+   #+BEGIN_SRC elisp
+   (setq pushbullet-token "your-api-token-here")
+   #+END_SRC
+   Or use =M-x customize-variable RET pushbullet-token=
+
+** Optional Configuration
+
+#+BEGIN_SRC elisp
+;; Number of pushes to fetch per request (default: 50)
+(setq pushbullet-limit 50)
+
+;; Default title for pushes (default: "GNU Emacs <version>")
+(setq pushbullet-default-title "My Emacs")
+
+;; Maximum columns for text wrapping (default: 108)
+(setq pushbullet-columns 108)
+
+;; Enable debug logging (default: nil)
+(setq pushbullet-debug t)
+#+END_SRC
+
+* Usage
+
+** Interactive Commands
+
+| Command                    | Description                    | Key Binding |
+|----------------------------|--------------------------------|-------------|
+| =M-x pushbullet=          | Open the Pushbullet Buffer  | -           |
+| =M-x pushbullet-send=     | Send a note with prompted title and text | - |
+| =M-x pushbullet-send-text=| Send a note with prompted text  | -           |
+| =M-x pushbullet-region=   | Send the current region        | -           |
+| =M-x pushbullet-yank=     | Send clipboard contents        | -           |
+| =M-x pushbullet-update=   | Update the Pushbullet buffer | =C-c C-u=   |
+
+** Key Bindings in Pushbullet Buffer
+
+| Key      | Function           |
+|----------|--------------------|
+| =C-c C-c=| Send a new push     |
+| =C-c C-u=| Update/refresh the buffer |
+| =q=      | Quit the buffer    |
+
+** Examples
+
+*** Send a Quick Note
+#+BEGIN_SRC elisp
+(pushbullet-send "Meeting Reminder" "Don't forget the team meeting at 3 PM")
+#+END_SRC
+
+*** Send Selected Text
+1. Select a region in any buffer
+2. Run =M-x pushbullet-region=
+3. The selected text will be sent with the buffer name as the title
+
+*** Send Clipboard Contents
+#+BEGIN_SRC elisp
+(pushbullet-yank)  ; Sends current kill-ring contents
+#+END_SRC
+
+*** Open the Interactive UI
+#+BEGIN_SRC elisp
+(pushbullet)  ; Opens the main Pushbullet buffer
+#+END_SRC
+
+* API Reference
+
+** Functions
+
+*** =pushbullet-send (title body)=
+Send a note to Pushbullet with the specified title and body text.
+
+*** =pushbullet-send-text (text)=
+Send a note with the default title and specified text.
+
+*** =pushbullet-region (start end)=
+Push the selected region to Pushbullet. The buffer name is used as the title.
+
+*** =pushbullet-yank ()=
+Push the current kill-ring (clipboard) contents to Pushbullet.
+
+*** =pushbullet ()=
+Open the interactive Pushbullet UI buffer.
+
+*** =pushbullet-update ()=
+Fetch and display the latest pushes in the current buffer.
+
+** Customization Variables
+
+*** =pushbullet-token=
+Your Pushbullet API access token (required).
+
+*** =pushbullet-limit=
+Number of pushes to fetch per request (default: 50).
+
+*** =pushbullet-default-title=
+Default title for pushes (default: "GNU Emacs <version>").
+
+*** =pushbullet-columns=
+Maximum columns for text wrapping (default: 108).
+
+*** =pushbullet-debug=
+Enable debug logging (default: nil).
+
+* Dependencies
+
+This package requires the following Emacs packages:
+- =emacs= ~(>= 29.1)~
+- =request= ~(>= 0.3.3)~
+- =all-the-icons= ~(>= 5.0.0)~
+
+* License
+
+This project is licensed under the GNU General Public License v3.0 - see the [[file:LICENSE][LICENSE]] file for details.
+
+* Version
+
+Current version: 1.0.0
+
+* Changelog
+
+** 1.0.0
+- Initial release
+- Basic push sending functionality
+- Interactive Buffer
+- Region and clipboard integration
+- Pagination support
