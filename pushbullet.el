@@ -44,6 +44,7 @@
 (require 'json)
 (require 'button)
 (require 'all-the-icons)
+(require 'auth-source)
 
 (defconst pushbullet-version "1.0.0"
   "Version of the Pushbullet client")
@@ -110,7 +111,11 @@ The message is prefixed with '[pushbullet]' for identification."
 (defun pushbullet--check-token ()
   "Check if the Pushbullet token is configured."
   (unless pushbullet-token
-    (error "Please set your Pushbullet token with M-x customize-variable RET pushbullet-token")))
+    (let ((auth-source-token (auth-source-pick-first-password :host "pushbullet.com")))
+      (if auth-source-token
+          (setq pushbullet-token auth-source-token)
+        (error "Please set your Pushbullet token with M-x customize-variable RET pushbullet-token"))))
+  pushbullet-token)
 
 (defun pushbullet--request (method endpoint data callback &optional error-callback)
   "Make a request to the Pushbullet API.

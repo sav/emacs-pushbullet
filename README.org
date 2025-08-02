@@ -53,6 +53,11 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
    #+END_SRC
    Or use =M-x customize-variable RET pushbullet-token=
 
+3. Alternatively, just add an entry for `pushbullet.com` (lower-case) in your `.authinfo.gpg`:
+  #BEGIN_SRC authinfo
+  machine pushbullet.com password "your-api-token-here"
+  #END_SRC
+
 ** Optional Configuration
 
 #+BEGIN_SRC elisp
@@ -157,6 +162,7 @@ This package requires the following Emacs packages:
 - =emacs= ~(>= 29.1)~
 - =request= ~(>= 0.3.3)~
 - =all-the-icons= ~(>= 5.0.0)~
+- =auth-source= ~(>= 23.1)~
 
 * License
 
