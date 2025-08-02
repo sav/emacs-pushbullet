@@ -68,7 +68,7 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 (setq pushbullet-default-title "My Emacs")
 
 ;; Maximum columns for text wrapping (default: 108)
-(setq pushbullet-columns 108)
+(setq pushbullet-columns 80)
 
 ;; Enable debug logging (default: nil)
 (setq pushbullet-debug t)

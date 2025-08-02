@@ -71,7 +71,7 @@ You can obtain this from https://www.pushbullet.com/#settings/account"
   :type 'string
   :group 'pushbullet)
 
-(defcustom pushbullet-columns 108
+(defcustom pushbullet-columns 80
   "Maximum number of columns used to wrap lines in Pushbullet message display."
   :type 'integer
   :group 'pushbullet
@@ -139,63 +139,6 @@ ERROR-CALLBACK is called on error."
                   (lambda (&key error-thrown &allow-other-keys)
                     (message "Pushbullet API error: %s" error-thrown)))))))
 
-;;;###autoload
-(defun pushbullet-send (title body)
-  "Send a note to Pushbullet with TITLE and TEXT."
-  (interactive "sTitle: \nsText: ")
-  (let ((data `((type . "note")
-                (title . ,title)
-                (body . ,body))))
-    (pushbullet--request
-     "POST" "/pushes" data
-     (cl-function
-      (lambda (&key data &allow-other-keys)
-        (pushbullet--log "Note pushed successfully: %s" title))))))
-
-;;;###autoload
-(defun pushbullet-send-text (text)
-  "Send a note to Pushbullet with TEXT, using `pushbullet-default-title` as title."
-  (interactive "sText: ")
-  (pushbullet-send pushbullet-default-title text))
-
-;;;###autoload
-(defun pushbullet-region (start end)
-  "Push the selected region to Pushbullet.
-START and END define the region boundaries.
-The push title is set to the current buffer's name."
-  (interactive "r")
-  (unless (use-region-p)
-    (error "No region selected"))
-  (let ((text (buffer-substring-no-properties start end)))
-    (pushbullet-send (buffer-name) text)))
-
-;;;###autoload
-(defun pushbullet-yank ()
-  "Push the current kill-ring (clipboard) contents to Pushbullet."
-  (interactive)
-  (let ((text (current-kill 0)))
-    (unless text
-      (error "Kill ring is empty"))
-    (pushbullet-send pushbullet-default-title text)))
-
-(defvar pushbullet-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'pushbullet-send)
-    (define-key map (kbd "C-c C-u") 'pushbullet-update)
-    (define-key map (kbd "q") 'quit-window)
-    map)
-  "Keymap for `pushbullet-mode'.")
-
-(define-derived-mode pushbullet-mode fundamental-mode "Pushbullet"
-  "Major mode for Pushbullet UI buffer."
-  (kill-all-local-variables)
-  (use-local-map pushbullet-mode-map)
-  (setq mode-name "pushbullet")
-  (setq major-mode 'pushbullet-mode)
-  ;; TODO implement mode-line
-  ;; (setq mode-line-process nil)
-  (setq buffer-read-only t))
-
 (defun pushbullet--format-push (item)
   "Format a Pushbullet push ITEM for display in the UI buffer.
 Returns a formatted string with timestamp, sender info, title, and body."
@@ -251,6 +194,20 @@ Updates the buffer-local cursor for pagination and logs debug information."
               (pushbullet--display-push item))
             pushes))))
 
+(defun pushbullet--format-banner ()
+  "Format the banner header for the Pushbullet UI buffer.
+Returns a formatted string with the package name, version, and decorative separator."
+  (let ((banner (format "Pushbullet %s" pushbullet-version)))
+    (format "%s\n%s\n\n" banner (make-string (length banner) ?━))))
+
+(defun pushbullet--delete-first-occurence (pattern)
+  "Delete the region corresponding to the first match of PATTERN in the current buffer.
+PATTERN should be a regexp string."
+  (save-excursion
+    (goto-char (point-min))
+    (when (re-search-forward pattern nil t)
+      (delete-region (match-beginning 0) (match-end 0)))))
+
 ;;;###autoload
 (defun pushbullet-update ()
   "Fetch and display Pushbullet pushes in the current buffer.
@@ -267,19 +224,62 @@ This function is called automatically when opening the Pushbullet buffer."
         (pushbullet--display-pushes data)))))
   t)
 
-(defun pushbullet--format-banner ()
-  "Format the banner header for the Pushbullet UI buffer.
-Returns a formatted string with the package name, version, and decorative separator."
-  (let ((banner (format "Pushbullet %s" pushbullet-version)))
-    (format "%s\n%s\n\n" banner (make-string (length banner) ?━))))
+;;;###autoload
+(defun pushbullet-send (title body)
+  "Send a note to Pushbullet with TITLE and TEXT."
+  (interactive "sTitle: \nsText: ")
+  (let ((data `((type . "note")
+                (title . ,title)
+                (body . ,body))))
+    (pushbullet--request
+     "POST" "/pushes" data
+     (cl-function
+      (lambda (&key data &allow-other-keys)
+        (pushbullet--log "Note pushed successfully: %s" title))))))
 
-(defun pushbullet--delete-first-occurence (pattern)
-  "Delete the region corresponding to the first match of PATTERN in the current buffer.
-PATTERN should be a regexp string."
-  (save-excursion
-    (goto-char (point-min))
-    (when (re-search-forward pattern nil t)
-      (delete-region (match-beginning 0) (match-end 0)))))
+;;;###autoload
+(defun pushbullet-send-text (text)
+  "Send a note to Pushbullet with TEXT, using `pushbullet-default-title` as title."
+  (interactive "sText: ")
+  (pushbullet-send pushbullet-default-title text))
+
+;;;###autoload
+(defun pushbullet-region (start end)
+  "Push the selected region to Pushbullet.
+START and END define the region boundaries.
+The push title is set to the current buffer's name."
+  (interactive "r")
+  (unless (use-region-p)
+    (error "No region selected"))
+  (let ((text (buffer-substring-no-properties start end)))
+    (pushbullet-send (buffer-name) text)))
+
+;;;###autoload
+(defun pushbullet-yank ()
+  "Push the current kill-ring (clipboard) contents to Pushbullet."
+  (interactive)
+  (let ((text (current-kill 0)))
+    (unless text
+      (error "Kill ring is empty"))
+    (pushbullet-send pushbullet-default-title text)))
+
+(defvar pushbullet-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") 'pushbullet-send)
+    (define-key map (kbd "C-c C-u") 'pushbullet-update)
+    (define-key map (kbd "C-c C-o") 'browse-url-at-point)
+    (define-key map (kbd "q") 'quit-window)
+    map)
+  "Keymap for `pushbullet-mode'.")
+
+(define-derived-mode pushbullet-mode fundamental-mode "Pushbullet"
+  "Major mode for Pushbullet UI buffer."
+  (kill-all-local-variables)
+  (use-local-map pushbullet-mode-map)
+  (setq mode-name "pushbullet")
+  (setq major-mode 'pushbullet-mode)
+  (goto-address-mode 1)
+  (setq buffer-read-only t))
 
 ;;;###autoload
 (defun pushbullet ()
