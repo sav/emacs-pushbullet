@@ -171,13 +171,39 @@ Returns a formatted string with timestamp, sender info, title, and body."
          (text (propertize body 'face '(fixed-pitch info-fixed-pitch))))
     (format "%s%s\n%s%s%s\n%s\n\n" separator1 datetime sender subject separator2 text)))
 
+(defun pushbullet--insert-button (label help value action)
+  (let ((start (point)))
+    (insert label)
+    (make-text-button
+     start (point)
+     'value value
+     'action `(lambda (btn)
+                (when (yes-or-no-p "Confirm action?")
+                  (,action (button-get btn 'value))))
+     'follow-link t
+     'help-echo help)))
+
+(defun pushbullet--delete-push (id)
+  (pushbullet--request
+   "DELETE" (format "/pushes/%s" id) nil
+   (cl-function
+    (lambda (&key data &allow-other-keys)
+      (pushbullet--log "Push deleted: %s" id)
+      (pushbullet)))))
+
 (defun pushbullet--display-push (item)
   "Display a single Pushbullet push ITEM in the current buffer.
 Only displays the push if it is active and has a non-empty body."
   (let ((active (alist-get 'active item))
         (body (alist-get 'body item)))
     (when (and active body (> (length body) 0))
-     (insert (pushbullet--format-push item)))))
+      (insert (pushbullet--format-push item))
+      (pushbullet--insert-button
+       "[delete]"
+       "Delete push"
+       (alist-get 'iden item)
+       'pushbullet--delete-push)
+      (insert "\n\n"))))
 
 (defun pushbullet--display-pushes (data)
   "Display multiple Pushbullet pushes from DATA in the UI buffer.
