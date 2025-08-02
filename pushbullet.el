@@ -178,24 +178,6 @@ The push title is set to the current buffer's name."
       (error "Kill ring is empty"))
     (pushbullet-send pushbullet-default-title text)))
 
-(defvar pushbullet-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'pushbullet-send)
-    (define-key map (kbd "C-c C-u") 'pushbullet-update)
-    (define-key map (kbd "q") 'quit-window)
-    map)
-  "Keymap for `pushbullet-mode'.")
-
-(define-derived-mode pushbullet-mode fundamental-mode "Pushbullet"
-  "Major mode for Pushbullet UI buffer."
-  (kill-all-local-variables)
-  (use-local-map pushbullet-mode-map)
-  (setq mode-name "pushbullet")
-  (setq major-mode 'pushbullet-mode)
-  ;; TODO implement mode-line
-  ;; (setq mode-line-process nil)
-  (setq buffer-read-only t))
-
 (defun pushbullet--format-push (item)
   "Format a Pushbullet push ITEM for display in the UI buffer.
 Returns a formatted string with timestamp, sender info, title, and body."
@@ -280,6 +262,24 @@ PATTERN should be a regexp string."
     (goto-char (point-min))
     (when (re-search-forward pattern nil t)
       (delete-region (match-beginning 0) (match-end 0)))))
+
+(defvar pushbullet-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "C-c C-c") 'pushbullet-send)
+    (define-key map (kbd "C-c C-u") 'pushbullet-update)
+    (define-key map (kbd "C-c C-o") 'browse-url-at-point)
+    (define-key map (kbd "q") 'quit-window)
+    map)
+  "Keymap for `pushbullet-mode'.")
+
+(define-derived-mode pushbullet-mode fundamental-mode "Pushbullet"
+  "Major mode for Pushbullet UI buffer."
+  (kill-all-local-variables)
+  (use-local-map pushbullet-mode-map)
+  (setq mode-name "pushbullet")
+  (setq major-mode 'pushbullet-mode)
+  (goto-address-mode 1)
+  (setq buffer-read-only t))
 
 ;;;###autoload
 (defun pushbullet ()
