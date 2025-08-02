@@ -56,8 +56,8 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 ** Optional Configuration
 
 #+BEGIN_SRC elisp
-;; Number of pushes to fetch per request (default: 50)
-(setq pushbullet-limit 50)
+;; Number of pushes to fetch per request (default: 20)
+(setq pushbullet-limit 20)
 
 ;; Default title for pushes (default: "GNU Emacs <version>")
 (setq pushbullet-default-title "My Emacs")

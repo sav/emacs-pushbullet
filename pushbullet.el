@@ -109,7 +109,6 @@ The message is prefixed with '[pushbullet]' for identification."
 
 (defun pushbullet--check-token ()
   "Check if the Pushbullet token is configured."
-;;; TODO use `auth-source` when unset
   (unless pushbullet-token
     (error "Please set your Pushbullet token with M-x customize-variable RET pushbullet-token")))
 
@@ -241,7 +240,6 @@ Updates the buffer-local cursor for pagination and logs debug information."
          (cursor (alist-get 'cursor data)))
     (pushbullet--log "Requested %S items, received %S" pushbullet-limit (length pushes))
     (setq pushbullet-cursor cursor)
-    ;; TODO add/update prompt
     (with-current-buffer (get-buffer-create pushbullet-buffer)
       (mapc (lambda (item)
               (goto-char (point-max))
@@ -270,7 +268,7 @@ Returns a formatted string with the package name, version, and decorative separa
   (let ((banner (format "Pushbullet %s" pushbullet-version)))
     (format "%s\n%s\n\n" banner (make-string (length banner) ?━))))
 
-(defun pushbullet-delete-first-occurence (pattern)
+(defun pushbullet--delete-first-occurence (pattern)
   "Delete the region corresponding to the first match of PATTERN in the current buffer.
 PATTERN should be a regexp string."
   (save-excursion
@@ -292,7 +290,7 @@ PATTERN should be a regexp string."
         (setq pushbullet-content-start-marker (point-max-marker))
         (insert (propertize loading-message 'face 'font-lock-comment-face))
         (pushbullet-update)
-        (pushbullet-delete-first-occurence loading-message)))
+        (pushbullet--delete-first-occurence loading-message)))
     (switch-to-buffer buffer))
   t)
 
