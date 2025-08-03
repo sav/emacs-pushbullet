@@ -167,9 +167,11 @@ Returns a formatted string with timestamp, sender info, title, and body."
                               (all-the-icons-faicon "pencil")
                               (propertize title 'face '(variable-pitch bold info-header-node)))
                     ""))
-         (body (or (alist-get 'body item) "… (nil) …"))
-         (text (propertize body 'face '(fixed-pitch info-fixed-pitch))))
-    (format "%s%s\n%s%s%s\n%s\n\n" separator1 datetime sender subject separator2 text)))
+         (body (or (alist-get 'body item) ""))
+         (text (propertize body 'face '(fixed-pitch info-fixed-pitch)))
+         (url (alist-get 'url item))
+         (link (if url (propertize url 'face 'custom-link) "")))
+    (format "%s%s\n%s%s%s\n%s%s\n\n" separator1 datetime sender subject separator2 link text)))
 
 (defun pushbullet--insert-button (label help value action)
   (let ((start (point)))
@@ -195,8 +197,15 @@ Returns a formatted string with timestamp, sender info, title, and body."
   "Display a single Pushbullet push ITEM in the current buffer.
 Only displays the push if it is active and has a non-empty body."
   (let ((active (alist-get 'active item))
-        (body (alist-get 'body item)))
-    (when (and active body (> (length body) 0))
+        (title (alist-get 'title item))
+        (body (alist-get 'body item))
+        (url (alist-get 'url item)))
+    (when (and
+           active
+           (or
+            title
+            (and body (> (length body) 0))
+            (and url (> (length url) 0))))
       (insert (pushbullet--format-push item))
       (pushbullet--insert-button
        "[delete]"
