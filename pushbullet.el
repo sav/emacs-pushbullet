@@ -243,6 +243,21 @@ PATTERN should be a regexp string."
     (when (re-search-forward pattern nil t)
       (delete-region (match-beginning 0) (match-end 0)))))
 
+(defun pushbullet--ui ()
+  "Initialize and render the Pushbullet UI in the current buffer.
+
+This clears the buffer, inserts a banner at the top, displays a temporary
+loading message, and then triggers a Pushbullet update to fetch and render
+the pushes. Once the pushes are loaded, the loading message is removed."
+  (let ((inhibit-read-only t)
+        (loading-message "Loading pushes...\n\n"))
+    (erase-buffer)
+    (insert (propertize (pushbullet--format-banner) 'face 'font-lock-function-name-face))
+    (setq pushbullet-content-start-marker (point-max-marker))
+    (insert (propertize loading-message 'face 'font-lock-comment-face))
+    (pushbullet-update)
+    (pushbullet--delete-first-occurence loading-message)))
+
 ;;;###autoload
 (defun pushbullet-update ()
   "Fetch and display Pushbullet pushes in the current buffer.
@@ -323,14 +338,7 @@ The push title is set to the current buffer's name."
   (let ((buffer (get-buffer-create pushbullet-buffer)))
     (with-current-buffer buffer
       (pushbullet-mode)
-      (let ((inhibit-read-only t)
-            (loading-message "Loading pushes...\n\n"))
-        (erase-buffer)
-        (insert (propertize (pushbullet--format-banner) 'face 'font-lock-function-name-face))
-        (setq pushbullet-content-start-marker (point-max-marker))
-        (insert (propertize loading-message 'face 'font-lock-comment-face))
-        (pushbullet-update)
-        (pushbullet--delete-first-occurence loading-message)))
+      (pushbullet--ui))
     (switch-to-buffer buffer))
   t)
 
