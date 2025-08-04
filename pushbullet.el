@@ -315,10 +315,12 @@ The push title is set to the current buffer's name."
 
 (defvar pushbullet-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") 'pushbullet-send)
-    (define-key map (kbd "C-c C-u") 'pushbullet-update)
-    (define-key map (kbd "C-c C-o") 'browse-url-at-point)
-    (define-key map (kbd "q") 'quit-window)
+    (define-key map (kbd "C-c C-c") #'pushbullet-send)
+    (define-key map (kbd "C-c C-u") #'pushbullet-update)
+    (define-key map (kbd "C-c C-o") #'browse-url-at-point)
+    (define-key map (kbd "TAB") #'forward-button)
+    (define-key map (kbd "<backtab>") #'backward-button)
+    (define-key map (kbd "q") #'quit-window)
     map)
   "Keymap for `pushbullet-mode'.")
 
