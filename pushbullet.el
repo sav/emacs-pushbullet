@@ -139,10 +139,10 @@ ERROR-CALLBACK is called on error."
                   (lambda (&key error-thrown &allow-other-keys)
                     (message "Pushbullet API error: %s" error-thrown)))))))
 
-(defun pushbullet--format-push (item)
-  "Format a Pushbullet push ITEM for display in the UI buffer.
+(defun pushbullet--format-push (push)
+  "Format a Pushbullet push PUSH for display in the UI buffer.
 Returns a formatted string with timestamp, sender info, title, and body."
-  (let* ((created (seconds-to-time (alist-get 'created item)))
+  (let* ((created (seconds-to-time (alist-get 'created push)))
          (datetime (propertize (format " ( %s %s  %s %s ) %s"
                                        (all-the-icons-faicon "calendar")
                                        (format-time-string "%Y-%b-%d" created)
@@ -153,23 +153,23 @@ Returns a formatted string with timestamp, sender info, title, and body."
          (separator1 (propertize (make-string (- pushbullet-columns (length datetime) 3) ?━)
                                  'face 'shadow))
          (separator2 (propertize (make-string pushbullet-columns ?━) 'face 'shadow))
-         (sender-name (alist-get 'sender_name item))
-         (sender-email (alist-get 'sender_email item))
+         (sender-name (alist-get 'sender_name push))
+         (sender-email (alist-get 'sender_email push))
          (sender (format "%s %s %s\n"
                          (propertize "   From:" 'face 'shadow)
                          (all-the-icons-faicon "user")
                          (propertize (format "%s <%s>" sender-name sender-email)
                                      'face '(info-emphasis variable-pitch))))
-         (title (alist-get 'title item))
+         (title (alist-get 'title push))
          (subject (if title
                       (format "%s %s %s\n"
                               (propertize "Subject:" 'face 'shadow)
                               (all-the-icons-faicon "pencil")
                               (propertize title 'face '(variable-pitch bold info-header-node)))
                     ""))
-         (body (or (alist-get 'body item) ""))
+         (body (or (alist-get 'body push) ""))
          (text (propertize body 'face '(fixed-pitch info-fixed-pitch)))
-         (url (alist-get 'url item))
+         (url (alist-get 'url push))
          (link (if url (propertize url 'face 'custom-link) "")))
     (format "%s%s\n%s%s%s\n%s%s\n\n" separator1 datetime sender subject separator2 link text)))
 
@@ -193,40 +193,40 @@ Returns a formatted string with timestamp, sender info, title, and body."
       (pushbullet--log "Push deleted: %s" id)
       (pushbullet)))))
 
-(defun pushbullet--display-push (item)
-  "Display a single Pushbullet push ITEM in the current buffer.
+(defun pushbullet--display-push (push)
+  "Display a single Pushbullet push PUSH in the current buffer.
 Only displays the push if it is active and has a non-empty body."
-  (let ((active (alist-get 'active item))
-        (title (alist-get 'title item))
-        (body (alist-get 'body item))
-        (url (alist-get 'url item)))
+  (let ((active (alist-get 'active push))
+        (title (alist-get 'title push))
+        (body (alist-get 'body push))
+        (url (alist-get 'url push)))
     (when (and
            active
            (or
             title
             (and body (> (length body) 0))
             (and url (> (length url) 0))))
-      (insert (pushbullet--format-push item))
+      (insert (pushbullet--format-push push))
       (pushbullet--insert-button
        "[delete]"
        "Delete push"
-       (alist-get 'iden item)
+       (alist-get 'iden push)
        'pushbullet--delete-push)
       (insert "\n\n"))))
 
 (defun pushbullet--display-pushes (data)
   "Display multiple Pushbullet pushes from DATA in the UI buffer.
-DATA should contain 'pushes' (list of push items) and 'cursor' (pagination cursor).
+DATA should contain 'pushes' (list of pushes) and 'cursor' (pagination cursor).
 Updates the buffer-local cursor for pagination and logs debug information."
   (let* ((inhibit-read-only t)
          (pushes (alist-get 'pushes data))
          (cursor (alist-get 'cursor data)))
-    (pushbullet--log "Requested %S items, received %S" pushbullet-limit (length pushes))
+    (pushbullet--log "Requested %S pushes, received %S" pushbullet-limit (length pushes))
     (setq pushbullet-cursor cursor)
     (with-current-buffer (get-buffer-create pushbullet-buffer)
-      (mapc (lambda (item)
+      (mapc (lambda (push)
               (goto-char (point-max))
-              (pushbullet--display-push item))
+              (pushbullet--display-push push))
             pushes))))
 
 (defun pushbullet--format-banner ()
