@@ -226,7 +226,7 @@ Only displays the push if it is active and has a non-empty body."
     (pushbullet--log "Received %S pushes, received %S" pushbullet-limit (length pushes))
     (setq pushbullet-cursor cursor)
     (setq pushbullet-pushes (append pushbullet-pushes pushes))))
-    
+
 (defun pushbullet--display-pushes (data)
   "Display multiple Pushbullet pushes from DATA in the UI buffer.
 DATA should contain a list of 'pushes' and a pagination 'cursor'.
@@ -252,7 +252,7 @@ PATTERN should be a regexp string."
     (when (re-search-forward pattern nil t)
       (delete-region (match-beginning 0) (match-end 0)))))
 
-(defun pushbullet--ui ()
+(defun pushbullet--display ()
   "Initialize and render the Pushbullet UI in the current buffer.
 
 This clears the buffer, inserts a banner at the top, displays a temporary
@@ -271,8 +271,8 @@ the pushes. Once the pushes are loaded, the loading message is removed."
 
 (defun pushbullet--next-endpoint (cursor)
   (if cursor (format "/pushes?limit=%d&cursor=%s" pushbullet-limit pushbullet-cursor)
-             (format "/pushes?limit=%d" pushbullet-limit)))
-  
+    (format "/pushes?limit=%d" pushbullet-limit)))
+
 ;;;###autoload
 (defun pushbullet-update ()
   "Fetch and display Pushbullet pushes in the current buffer.
@@ -382,7 +382,7 @@ When PUSHES is nil, or when called interactively, use 'pushbullet-pushes'."
   (let ((buffer (get-buffer-create pushbullet-buffer)))
     (with-current-buffer buffer
       (pushbullet-mode)
-      (pushbullet--ui))
+      (pushbullet--display))
     (switch-to-buffer buffer))
   t)
 
