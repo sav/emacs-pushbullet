@@ -261,6 +261,7 @@ the pushes. Once the pushes are loaded, the loading message is removed."
   (let ((inhibit-read-only t)
         (loading-message "Loading pushes...\n\n"))
     (setq pushbullet-pushes nil)
+    (remove-overlays)
     (erase-buffer)
     (insert (propertize (pushbullet--format-banner) 'face 'font-lock-function-name-face))
     (setq pushbullet-content-start-marker (point-max-marker))
@@ -333,6 +334,7 @@ When PUSHES is nil, or when called interactively, use 'pushbullet-pushes'."
   (let ((buf (get-buffer-create pushbullet-export-buffer))
         (pushes (or pushes pushbullet-pushes)))
     (with-current-buffer buf
+      (remove-overlays)
       (erase-buffer)
       (insert "#+TITLE: Pushbullet Export\n\n")
       (mapc
