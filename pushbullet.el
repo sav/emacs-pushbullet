@@ -90,6 +90,12 @@ When non-nil, additional debug messages will be printed to the *Messages* buffer
 (defvar pushbullet-buffer "*Pushbullet*"
   "Name of the Pushbullet UI buffer.")
 
+(defvar pushbullet-export-buffer "*Pushbullet Export*"
+  "Name of the Pushbullet Export buffer.")
+
+(defvar-local pusbullet-pushes nil
+  "List of fetched Pushbullet pushes.")
+
 (defvar-local pushbullet-cursor nil
   "Cursor for pagination, returned by and used in the Pushbullet API.")
 
@@ -194,7 +200,7 @@ Returns a formatted string with timestamp, sender info, title, and body."
       (pushbullet)))))
 
 (defun pushbullet--display-push (push)
-  "Display a single Pushbullet push PUSH in the current buffer.
+  "Display a single PUSH in the current buffer.
 Only displays the push if it is active and has a non-empty body."
   (let ((active (alist-get 'active push))
         (title (alist-get 'title push))
@@ -214,20 +220,23 @@ Only displays the push if it is active and has a non-empty body."
        'pushbullet--delete-push)
       (insert "\n\n"))))
 
+(defun pushbullet--add-pushes (data)
+  (let ((pushes (alist-get 'pushes data))
+        (cursor (alist-get 'cursor data)))
+    (pushbullet--log "Received %S pushes, received %S" pushbullet-limit (length pushes))
+    (setq pushbullet-cursor cursor)
+    (setq pushbullet-pushes (append pushbullet-pushes pushes))))
+    
 (defun pushbullet--display-pushes (data)
   "Display multiple Pushbullet pushes from DATA in the UI buffer.
-DATA should contain 'pushes' (list of pushes) and 'cursor' (pagination cursor).
+DATA should contain a list of 'pushes' and a pagination 'cursor'.
 Updates the buffer-local cursor for pagination and logs debug information."
-  (let* ((inhibit-read-only t)
-         (pushes (alist-get 'pushes data))
-         (cursor (alist-get 'cursor data)))
-    (pushbullet--log "Requested %S pushes, received %S" pushbullet-limit (length pushes))
-    (setq pushbullet-cursor cursor)
+  (let ((inhibit-read-only t))
     (with-current-buffer (get-buffer-create pushbullet-buffer)
       (mapc (lambda (push)
               (goto-char (point-max))
               (pushbullet--display-push push))
-            pushes))))
+            pushbullet-pushes))))
 
 (defun pushbullet--format-banner ()
   "Format the banner header for the Pushbullet UI buffer.
@@ -251,6 +260,7 @@ loading message, and then triggers a Pushbullet update to fetch and render
 the pushes. Once the pushes are loaded, the loading message is removed."
   (let ((inhibit-read-only t)
         (loading-message "Loading pushes...\n\n"))
+    (setq pushbullet-pushes nil)
     (erase-buffer)
     (insert (propertize (pushbullet--format-banner) 'face 'font-lock-function-name-face))
     (setq pushbullet-content-start-marker (point-max-marker))
@@ -258,20 +268,22 @@ the pushes. Once the pushes are loaded, the loading message is removed."
     (pushbullet-update)
     (pushbullet--delete-first-occurence loading-message)))
 
+(defun pushbullet--next-endpoint (cursor)
+  (if cursor (format "/pushes?limit=%d&cursor=%s" pushbullet-limit pushbullet-cursor)
+             (format "/pushes?limit=%d" pushbullet-limit)))
+  
 ;;;###autoload
 (defun pushbullet-update ()
   "Fetch and display Pushbullet pushes in the current buffer.
 Uses pagination cursor if available to fetch additional pushes.
 This function is called automatically when opening the Pushbullet buffer."
   (interactive)
-  (let ((endpoint (if pushbullet-cursor
-                      (format "/pushes?limit=%d&cursor=%s" pushbullet-limit pushbullet-cursor)
-                    (format "/pushes?limit=%d" pushbullet-limit))))
-    (pushbullet--request
-     "GET" endpoint nil
-     (cl-function
-      (lambda (&key data &allow-other-keys)
-        (pushbullet--display-pushes data)))))
+  (pushbullet--request
+   "GET" (pushbullet--next-endpoint pushbullet-cursor) nil
+   (cl-function
+    (lambda (&key data &allow-other-keys)
+      (pushbullet--add-pushes data)
+      (pushbullet--display-pushes data))))
   t)
 
 ;;;###autoload
@@ -313,9 +325,37 @@ The push title is set to the current buffer's name."
       (error "Kill ring is empty"))
     (pushbullet-send pushbullet-default-title text)))
 
+;;;###autoload
+(defun pushbullet-export (&optional pushes)
+  "Export PUSHES into an Org-mode buffer.
+When PUSHES is nil, or when called interactively, use 'pushbullet-pushes'."
+  (interactive)
+  (let ((buf (get-buffer-create pushbullet-export-buffer))
+        (pushes (or pushes pushbullet-pushes)))
+    (with-current-buffer buf
+      (erase-buffer)
+      (insert "#+TITLE: Pushbullet Export\n\n")
+      (mapc
+       (lambda (push)
+         (let ((active (alist-get 'active push))
+               (title  (alist-get 'title push))
+               (body   (alist-get 'body push))
+               (url    (alist-get 'url push)))
+           (when active
+             (if title (insert (format "* %s\n" title))
+               (insert "* "))
+             (when url (insert (format "[[%s]]\n" url)))
+             (if body (insert (format "%s\n" body))
+               (insert "<empty>\n")))))
+       pushes)
+      (goto-char (point-min))
+      (org-mode))
+    (switch-to-buffer buf)))
+
 (defvar pushbullet-mode-map
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-c") #'pushbullet-send)
+    (define-key map (kbd "C-c C-e") #'pushbullet-export)
     (define-key map (kbd "C-c C-u") #'pushbullet-update)
     (define-key map (kbd "C-c C-o") #'browse-url-at-point)
     (define-key map (kbd "TAB") #'forward-button)
