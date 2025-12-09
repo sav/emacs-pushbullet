@@ -25,97 +25,96 @@
 
 ;;; Commentary:
 
-;; This package provides Pushbullet integration for Emacs, allowing you to:
-;; - Send notes to Pushbullet
-;; - Push text regions and clipboard contents
-;; - Browse and manage your Pushbullet pushes in a dedicated UI buffer
+;;;; This package provides a comprehensive Emacs client for the Pushbullet service.
+;;; It enables users to:
+;;; - Send various types of pushes (notes, links) from Emacs.
+;;; - Push selected text regions or clipboard contents directly to Pushbullet.
+;;; - Browse, add, delete, and send Pushbullet pushes within a dedicated Emacs UI.
+;;; - Export pushes to Org-mode format.
 
-;; Usage:
+;;; Usage Examples:
 
-;;   M-x pushbullet            Open the Pushbullet buffer
-;;   M-x pushbullet-send       Send a note with prompted title and text
-;;   M-x pushbullet-send-text  Send a note with prompted text
-;;   M-x pushbullet-region     Send the current region
-;;   M-x pushbullet-yank       Send the current kill-ring contents
+;;;   `M-x pushbullet`           : Opens or switches to the main Pushbullet UI buffer.
+;;;   `M-x pushbullet-send`      : Prompts for a title and text to send a new note push.
+;;;   `M-x pushbullet-send-text` : Prompts for text to send a new note push, using a default title.
+;;;   `M-x pushbullet-region`    : Sends the active region's content as a note push.
+;;;   `M-x pushbullet-yank`      : Sends the latest kill-ring entry (clipboard content) as a note push.
+;;;   `M-x pushbullet-export`    : Exports currently fetched pushes to an Org-mode buffer.
 
 ;;; Code:
 
 (require 'request)
 (require 'json)
-(require 'button)
-(require 'all-the-icons)
 (require 'auth-source)
+(require 'pushbullet-ui)
+(require 'cl-lib)
 
 (defconst pushbullet-version "1.0.1"
-  "Version of the Pushbullet client")
+   "The current version string of the Pushbullet Emacs package.")
 
 (defgroup pushbullet nil
-  "Pushbullet client."
-  :version pushbullet-version
-  :prefix "pushbullet-"
-  :group 'applications)
+   "Client for the Pushbullet service, providing integration with Emacs."
+   :version pushbullet-version
+   :prefix "pushbullet-"
+   :group 'applications)
 
 (defcustom pushbullet-token nil
-  "Your Pushbullet API access token.
-You can obtain this from https://www.pushbullet.com/#settings/account"
+  "Your personal Pushbullet API access token.
+This token is required for authentication with the Pushbullet API. You
+can obtain your access token from the Pushbullet account settings page:
+`https://www.pushbullet.com/#settings/account`."
   :type 'string
   :group 'pushbullet)
 
 (defcustom pushbullet-limit 20
-  "Number of pushes to fetch per request."
-  :type 'integer
-  :group 'pushbullet)
+   "The maximum number of pushes to fetch in a single API request for
+ pagination."
+   :type 'integer
+   :group 'pushbullet)
 
 (defcustom pushbullet-default-title (format "GNU Emacs %s" emacs-version)
-  "Default title used when sending a push without an explicit title."
+  "The default title string used for new pushes when no explicit title
+ is provided.
+It is formatted to include the current Emacs version."
   :type 'string
   :group 'pushbullet)
 
-(defcustom pushbullet-columns 80
-  "Maximum number of columns used to wrap lines in Pushbullet message display."
-  :type 'integer
-  :group 'pushbullet
-  :initialize 'custom-initialize-default)
-
 (defcustom pushbullet-debug nil
   "Enable verbose logging for Pushbullet operations.
-When non-nil, additional debug messages will be printed to the *Messages* buffer."
+When non-nil, additional debug messages will be printed to the
+*Messages* buffer."
   :type 'boolean
   :group 'pushbullet
   :initialize 'custom-initialize-default)
 
-(defvar pushbullet-api "https://api.pushbullet.com/v2"
-  "Base URL for Pushbullet API.")
+(defvar pushbullet-api-url "https://api.pushbullet.com/v2"
+   "The base URL for all Pushbullet API v2 endpoints.")
 
 (defvar pushbullet-buffer "*Pushbullet*"
-  "Name of the Pushbullet UI buffer.")
+  "The name of the main buffer where the Pushbullet user interface is
+ displayed.")
 
 (defvar pushbullet-export-buffer "*Pushbullet Export*"
-  "Name of the Pushbullet Export buffer.")
-
-(defvar-local pusbullet-pushes nil
-  "List of fetched Pushbullet pushes.")
+   "The name of the buffer used for exporting Pushbullet pushes to
+ Org-mode format.")
 
 (defvar-local pushbullet-cursor nil
-  "Cursor for pagination, returned by and used in the Pushbullet API.")
-
-(defvar-local pushbullet-content-start-marker nil
-  "Marker indicating the beginning of the content.")
-
-(defvar-local pushbullet-prompt-start-marker nil
-  "Marker indicating the beginning of the message prompt.")
-
-(defvar-local pushbullet-prompt-end-marker nil
-  "Marker indicating the end of the message prompt.")
+   "A buffer-local string used for pagination in Pushbullet API requests,
+ indicating the point from which to fetch subsequent pushes.")
 
 (defmacro pushbullet--log (fmt &rest args)
-  "Log a debug message with FMT and ARGS when `pushbullet-debug' is enabled.
+  "Log a debug message with FMT and ARGS when `pushbullet-debug' is
+ enabled.
 The message is prefixed with '[pushbullet]' for identification."
   `(when pushbullet-debug
      (message (concat "[pushbullet] " ,fmt) ,@args)))
 
 (defun pushbullet--check-token ()
-  "Check if the Pushbullet token is configured."
+  "Ensures that the `pushbullet-token' is set, either directly or by
+ retrieving it from `auth-source'.
+If the token is not found, an error is signaled prompting the user to
+set it."
+  pushbullet-token
   (unless pushbullet-token
     (let ((auth-source-token (auth-source-pick-first-password :host "pushbullet.com")))
       (if auth-source-token
@@ -124,14 +123,18 @@ The message is prefixed with '[pushbullet]' for identification."
   pushbullet-token)
 
 (defun pushbullet--request (method endpoint data callback &optional error-callback)
-  "Make a request to the Pushbullet API.
-METHOD is the HTTP method (GET, POST, etc.).
-ENDPOINT is the API endpoint.
-DATA is the request data.
-CALLBACK is called on success.
-ERROR-CALLBACK is called on error."
+  "Makes an asynchronous HTTP request to the Pushbullet API.
+
+METHOD is a string representing the HTTP method (e.g., 'GET', 'POST', 'DELETE').
+ENDPOINT is a string specifying the API endpoint relative to `pushbullet-api-url`.
+DATA is an optional alist of request data to be sent as JSON.
+CALLBACK is a function to be called upon successful API response, receiving the parsed JSON data.
+ERROR-CALLBACK is an optional function to be called if the API request encounters an error.
+
+This function automatically includes the `pushbullet-token' for
+authentication and handles JSON encoding/decoding."
   (pushbullet--check-token)
-  (let ((url (concat pushbullet-api endpoint))
+  (let ((url (concat pushbullet-api-url endpoint))
         (headers `(("Access-Token" . ,pushbullet-token)
                    ("Content-Type" . "application/json"))))
     (request url
@@ -145,172 +148,108 @@ ERROR-CALLBACK is called on error."
                   (lambda (&key error-thrown &allow-other-keys)
                     (message "Pushbullet API error: %s" error-thrown)))))))
 
-(defun pushbullet--format-push (push)
-  "Format a Pushbullet push PUSH for display in the UI buffer.
-Returns a formatted string with timestamp, sender info, title, and body."
-  (let* ((created (seconds-to-time (alist-get 'created push)))
-         (datetime (propertize (format " ( %s %s  %s %s ) %s"
-                                       (all-the-icons-faicon "calendar")
-                                       (format-time-string "%Y-%b-%d" created)
-                                       (all-the-icons-faicon "clock-o")
-                                       (format-time-string "%H:%M" created)
-                                       (make-string 4 ?━))
-                               'face 'shadow))
-         (separator1 (propertize (make-string (- pushbullet-columns (length datetime) 3) ?━)
-                                 'face 'shadow))
-         (separator2 (propertize (make-string pushbullet-columns ?━) 'face 'shadow))
-         (sender-name (alist-get 'sender_name push))
-         (sender-email (alist-get 'sender_email push))
-         (sender (format "%s %s %s\n"
-                         (propertize "   From:" 'face 'shadow)
-                         (all-the-icons-faicon "user")
-                         (propertize (format "%s <%s>" sender-name sender-email)
-                                     'face '(info-emphasis variable-pitch))))
+(defun pushbullet--next-endpoint (&optional limit)
+  "Constructs the API endpoint for fetching pushes, incorporating
+ `CURSOR' for pagination.
+If CURSOR is `nil', it fetches the initial set of pushes. Otherwise, it
+fetches subsequent pushes using the provided CURSOR value and
+`pushbullet-limit`.
+Then the optional argument LIMIT is provided, fetch at most LIMIT items."
+  (let* ((n (or limit pushbullet-limit)))
+    (if pushbullet-cursor
+        (format "/pushes?limit=%d&cursor=%s" n pushbullet-cursor)
+      (format "/pushes?limit=%d" n))))
+
+(defun pushbullet-active (push)
+  "Returns true if PUSH has data and should be displayed. Returns `nil'
+ otherwise."
+  (let* ((active (alist-get 'active push))
          (title (alist-get 'title push))
-         (subject (if title
-                      (format "%s %s %s\n"
-                              (propertize "Subject:" 'face 'shadow)
-                              (all-the-icons-faicon "pencil")
-                              (propertize title 'face '(variable-pitch bold info-header-node)))
-                    ""))
-         (body (or (alist-get 'body push) ""))
-         (text (propertize body 'face '(fixed-pitch info-fixed-pitch)))
          (url (alist-get 'url push))
-         (link (if url (propertize url 'face 'custom-link) "")))
-    (format "%s%s\n%s%s%s\n%s%s\n\n" separator1 datetime sender subject separator2 link text)))
+         (body (alist-get 'body push)))
+    (and (and active (not (eq active :json-false))) 
+         (or (not (string-empty-p title))
+             (not (string-empty-p url))
+             (not (string-empty-p body))))))
 
-(defun pushbullet--insert-button (label help value action)
-  (let ((start (point)))
-    (insert label)
-    (make-text-button
-     start (point)
-     'value value
-     'action `(lambda (btn)
-                (when (yes-or-no-p "Confirm action?")
-                  (,action (button-get btn 'value))))
-     'follow-link t
-     'help-echo help)))
-
-(defun pushbullet--delete-push (id)
+(defun pushbullet-fetch (callback &optional limit)
+  "Fetches Pushbullet pushes from the API.
+It uses `pushbullet-cursor' for pagination to fetch subsequent sets of
+pushes. Upon successful retrieval, the fetched pushes are filtered,
+`pushbullet-cursor' is updated, and CALLBACK is invoked with the
+filtered pushes. When optional argument LIIMIT is provided, fetch at
+most LIMIT items."
   (pushbullet--request
-   "DELETE" (format "/pushes/%s" id) nil
+   "GET" (pushbullet--next-endpoint limit) nil
    (cl-function
     (lambda (&key data &allow-other-keys)
-      (pushbullet--log "Push deleted: %s" id)
-      (pushbullet)))))
+      (let* ((pushes (alist-get 'pushes data))
+             (cursor (alist-get 'cursor data)))
+        (pushbullet--log "Received %S pushes" (length pushes))
+        (setq pushbullet-cursor cursor)
+        (funcall callback (cl-coerce pushes 'list)))))))
 
-(defun pushbullet--display-push (push)
-  "Display a single PUSH in the current buffer.
-Only displays the push if it is active and has a non-empty body."
-  (let ((active (alist-get 'active push))
-        (title (alist-get 'title push))
-        (body (alist-get 'body push))
-        (url (alist-get 'url push)))
-    (when (and
-           active
-           (or
-            title
-            (and body (> (length body) 0))
-            (and url (> (length url) 0))))
-      (insert (pushbullet--format-push push))
-      (pushbullet--insert-button
-       "[delete]"
-       "Delete push"
-       (alist-get 'iden push)
-       'pushbullet--delete-push)
-      (insert "\n\n"))))
-
-(defun pushbullet--add-pushes (data)
-  (let ((pushes (alist-get 'pushes data))
-        (cursor (alist-get 'cursor data)))
-    (pushbullet--log "Received %S pushes, received %S" pushbullet-limit (length pushes))
-    (setq pushbullet-cursor cursor)
-    (setq pushbullet-pushes (append pushbullet-pushes pushes))))
-
-(defun pushbullet--display-pushes (data)
-  "Display multiple Pushbullet pushes from DATA in the UI buffer.
-DATA should contain a list of 'pushes' and a pagination 'cursor'.
-Updates the buffer-local cursor for pagination and logs debug information."
-  (let ((inhibit-read-only t))
-    (with-current-buffer (get-buffer-create pushbullet-buffer)
-      (mapc (lambda (push)
-              (goto-char (point-max))
-              (pushbullet--display-push push))
-            pushbullet-pushes))))
-
-(defun pushbullet--format-banner ()
-  "Format the banner header for the Pushbullet UI buffer.
-Returns a formatted string with the package name, version, and decorative separator."
-  (let ((banner (format "Pushbullet %s" pushbullet-version)))
-    (format "%s\n%s\n\n" banner (make-string (length banner) ?━))))
-
-(defun pushbullet--delete-first-occurence (pattern)
-  "Delete the region corresponding to the first match of PATTERN in the current buffer.
-PATTERN should be a regexp string."
-  (save-excursion
-    (goto-char (point-min))
-    (when (re-search-forward pattern nil t)
-      (delete-region (match-beginning 0) (match-end 0)))))
-
-(defun pushbullet--display ()
-  "Initialize and render the Pushbullet UI in the current buffer.
-
-This clears the buffer, inserts a banner at the top, displays a temporary
-loading message, and then triggers a Pushbullet update to fetch and render
-the pushes. Once the pushes are loaded, the loading message is removed."
-  (let ((inhibit-read-only t)
-        (loading-message "Loading pushes...\n\n"))
-    (setq pushbullet-pushes nil)
-    (remove-overlays)
-    (erase-buffer)
-    (insert (propertize (pushbullet--format-banner) 'face 'font-lock-function-name-face))
-    (setq pushbullet-content-start-marker (point-max-marker))
-    (insert (propertize loading-message 'face 'font-lock-comment-face))
-    (pushbullet-update)
-    (pushbullet--delete-first-occurence loading-message)))
-
-(defun pushbullet--next-endpoint (cursor)
-  (if cursor (format "/pushes?limit=%d&cursor=%s" pushbullet-limit pushbullet-cursor)
-    (format "/pushes?limit=%d" pushbullet-limit)))
-
-;;;###autoload
-(defun pushbullet-update ()
-  "Fetch and display Pushbullet pushes in the current buffer.
-Uses pagination cursor if available to fetch additional pushes.
-This function is called automatically when opening the Pushbullet buffer."
-  (interactive)
-  (pushbullet--request
-   "GET" (pushbullet--next-endpoint pushbullet-cursor) nil
-   (cl-function
-    (lambda (&key data &allow-other-keys)
-      (pushbullet--add-pushes data)
-      (pushbullet--display-pushes data))))
-  t)
-
-;;;###autoload
-(defun pushbullet-send (title body)
-  "Send a note to Pushbullet with TITLE and TEXT."
-  (interactive "sTitle: \nsText: ")
-  (let ((data `((type . "note")
-                (title . ,title)
-                (body . ,body))))
+(defun pushbullet-delete (push)
+  "Deletes the specified PUSH (an alist containing at least an 'iden
+ field) from the Pushbullet server.
+Upon successful deletion, a debug message is logged, and the Pushbullet
+UI is implicitly refreshed by `pushbullet` being called."
+  (let ((id (alist-get 'iden push)))
     (pushbullet--request
-     "POST" "/pushes" data
+     "DELETE" (format "/pushes/%s" id) nil
      (cl-function
       (lambda (&key data &allow-other-keys)
-        (pushbullet--log "Note pushed successfully: %s" title))))))
+        (pushbullet--log "Push deleted: %S" push))))))
+
+;;;###autoload
+(defun pushbullet-send (title body &optional url)
+  "Sends a note push to Pushbullet with the given TITLE and BODY.
+An optional URL can be provided to create a link push instead of a
+simple note.
+
+TITLE is a string specifying the title of the push.
+BODY is a string specifying the main content of the push.
+URL is an optional string specifying a URL to be included, transforming
+the push into a link.
+
+This function is interactive, prompting the user for TITLE and BODY if
+called without arguments."
+  (interactive "sTitle: \nsText: ")
+  (let ((push `((type . ,"note")
+                (title . ,title)
+                (body . ,body))))
+    (when url (push '(url . url) push))
+    (pushbullet--log "Pushing: %S" push)
+    (pushbullet--request
+     "POST" "/pushes" push
+     (cl-function
+      (lambda (&key data &allow-other-keys)
+        (pushbullet--log "Pushed: %s" data))))))
 
 ;;;###autoload
 (defun pushbullet-send-text (text)
-  "Send a note to Pushbullet with TEXT, using `pushbullet-default-title` as title."
+  "Sends a note push to Pushbullet with the provided TEXT.
+The title for the push is automatically set using the
+`pushbullet-default-title' variable.
+
+TEXT is a string representing the content of the note push.
+
+This function is interactive, prompting the user for the TEXT content if
+called without arguments."
   (interactive "sText: ")
   (pushbullet-send pushbullet-default-title text))
 
 ;;;###autoload
 (defun pushbullet-region (start end)
-  "Push the selected region to Pushbullet.
-START and END define the region boundaries.
-The push title is set to the current buffer's name."
+  "Sends the content of the currently active region to Pushbullet as a
+ note push.
+The text between START and END is used as the body, and the current
+buffer's name is used as the title.
+
+START and END are buffer positions defining the region.
+
+This function is interactive and requires an active region to be
+selected."
   (interactive "r")
   (unless (use-region-p)
     (error "No region selected"))
@@ -319,7 +258,12 @@ The push title is set to the current buffer's name."
 
 ;;;###autoload
 (defun pushbullet-yank ()
-  "Push the current kill-ring (clipboard) contents to Pushbullet."
+  "Sends the latest entry from the Emacs kill-ring (clipboard) to
+ Pushbullet as a note push.
+The kill-ring content is used as the body, and the title is set to
+`pushbullet-default-title'.
+
+This function is interactive and will signal an error if the kill-ring is empty."
   (interactive)
   (let ((text (current-kill 0)))
     (unless text
@@ -328,12 +272,20 @@ The push title is set to the current buffer's name."
 
 ;;;###autoload
 (defun pushbullet-export (&optional pushes)
-  "Export PUSHES into an Org-mode buffer.
-When PUSHES is nil, or when called interactively, use 'pushbullet-pushes'."
+  "Exports a list of PUSHES to a new Org-mode buffer named
+ `pushbullet-export-buffer'.
+
+Each active push is formatted as an Org-mode heading, including its
+title, URL (if present), and body.
+
+If PUSHES is `nil` or the function is called interactively, it exports
+the currently displayed pushes from the UI (`pushbullet-ui--pushes`).
+
+This function is interactive."
   (interactive)
-  (let ((buf (get-buffer-create pushbullet-export-buffer))
-        (pushes (or pushes pushbullet-pushes)))
-    (with-current-buffer buf
+  (let ((buffer (get-buffer-create pushbullet-export-buffer))
+    	(pushes (or pushes pushbullet-ui--pushes)))
+    (with-current-buffer buffer
       (remove-overlays)
       (erase-buffer)
       (insert "#+TITLE: Pushbullet Export\n\n")
@@ -352,39 +304,61 @@ When PUSHES is nil, or when called interactively, use 'pushbullet-pushes'."
        pushes)
       (goto-char (point-min))
       (org-mode))
-    (switch-to-buffer buf)))
+    (switch-to-buffer buffer)))
 
-(defvar pushbullet-mode-map
+(defconst pushbullet-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-c") #'pushbullet-send)
-    (define-key map (kbd "C-c C-e") #'pushbullet-export)
-    (define-key map (kbd "C-c C-u") #'pushbullet-update)
+    (define-key map (kbd "C-c C-e") #'pushbullet-ui--export-all)
+    (define-key map (kbd "C-c C-u") #'pushbullet-ui--load-more)
     (define-key map (kbd "C-c C-o") #'browse-url-at-point)
-    (define-key map (kbd "TAB") #'forward-button)
-    (define-key map (kbd "<backtab>") #'backward-button)
     (define-key map (kbd "q") #'quit-window)
     map)
-  "Keymap for `pushbullet-mode'.")
+  "Keymap for `pushbullet-mode', defining keybindings for interacting
+ with the Pushbullet UI.
 
-(define-derived-mode pushbullet-mode fundamental-mode "Pushbullet"
-  "Major mode for Pushbullet UI buffer."
-  (kill-all-local-variables)
-  (use-local-map pushbullet-mode-map)
-  (setq mode-name "pushbullet")
-  (setq major-mode 'pushbullet-mode)
-  (goto-address-mode 1)
-  (setq buffer-read-only t))
+- `C-c C-e': Calls `pushbullet-ui--export-all` to export pushes to Org-mode.
+- `C-c C-u': Calls `pushbullet-ui--load-more` to fetch more pushes.
+- `C-c C-o': Calls `browse-url-at-point` to open a URL at the current cursor position.
+- `q': Calls `quit-window` to close the Pushbullet UI buffer.")
+
+(defvar pushbullet-api '((active . pushbullet-active)
+                         (fetch . pushbullet-fetch)
+                         (send . pushbullet-send)
+                         (del . pushbullet-delete)
+                         (export . pushbullet-export))
+
+  "An alist of callback functions that map Pushbullet API operations to
+ their corresponding backend functions.
+This alist is passed to the Pushbullet UI to facilitate interaction with
+the API.
+
+- `active': Function to check if a push is active (`pushbullet-active').
+- `fetch': Function to retrieve pushes (`pushbullet-fetch').
+- `send': Function to create and send a new push (`pushbullet-send').
+- `del': Function to remove a push (`pushbullet-delete').
+- `export': Function to export the current pushes to Org-mode (`pushbullet-export').")
 
 ;;;###autoload
 (defun pushbullet ()
-  "Open the Pushbullet UI buffer."
+  "Opens or switches to the main Pushbullet UI buffer (`pushbullet-buffer').
+This function initializes the Pushbullet UI by setting up buffer-local
+variables, configuring `pushbullet-mode', and fetching the latest pushes
+from the Pushbullet API. If the buffer already exists, it is
+re-initialized and updated to reflect the current state.
+
+This function is interactive."
   (interactive)
-  (let ((buffer (get-buffer-create pushbullet-buffer)))
-    (with-current-buffer buffer
-      (pushbullet-mode)
-      (pushbullet--display))
-    (switch-to-buffer buffer))
-  t)
+  (when (null (get-buffer pushbullet-buffer))
+    (let ((buffer (get-buffer-create pushbullet-buffer)) 
+	  (title (format "Pushbullet %s" pushbullet-version)))
+      (with-current-buffer buffer
+        (kill-all-local-variables)
+        (remove-overlays)
+        (erase-buffer)
+        (setq pushbullet-cursor nil)
+        (pushbullet-ui title pushbullet-buffer pushbullet-api pushbullet-mode-map))))
+  (switch-to-buffer-other-window (get-buffer pushbullet-buffer))
+  nil)
 
 (provide 'pushbullet)
 
