@@ -4,12 +4,12 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 
 * Features
 
+- Interactive UI: Browse and manage your pushes in a dedicated Emacs buffer
 - Send Notes: Send text notes to Pushbullet with custom titles
 - Region Pushing: Push selected text regions to your devices
 - Clipboard Integration: Send clipboard contents to Pushbullet
-- Interactive UI: Browse and manage your pushes in a dedicated Emacs buffer
-- Modern Interface: Beautiful formatting with icons and proper typography
 - Pagination Support: Load multiple pages of pushes efficiently
+- Export Pushes to Org-Mode
 
 * Installation
 
@@ -49,9 +49,9 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 
 2. Configure the token in Emacs:
    #+BEGIN_SRC elisp
-   (setq pushbullet-token "your-api-token-here")
+   (setq pushbullet-api-token "your-api-token-here")
    #+END_SRC
-   Or use =M-x customize-variable RET pushbullet-token=
+   Or use =M-x customize-variable RET pushbullet-api-token=
 
 3. Alternatively, just add an entry for `pushbullet.com` (lower-case) in your `.authinfo.gpg`:
   #BEGIN_SRC authinfo
@@ -61,39 +61,41 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 ** Optional Configuration
 
 #+BEGIN_SRC elisp
-;; Number of pushes to fetch per request (default: 20)
-(setq pushbullet-limit 20)
+;; Number of pushes to fetch per request
+(setq pushbullet-api-limit 50)
 
-;; Default title for pushes (default: "GNU Emacs <version>")
+;; Default title for pushes
 (setq pushbullet-default-title "My Emacs")
 
-;; Maximum columns for text wrapping (default: 108)
-(setq pushbullet-columns 80)
+;; Maximum columns for text wrapping
+(setq pushbullet-columns 100)
 
 ;; Enable debug logging (default: nil)
-(setq pushbullet-debug t)
+(setq pushbullet-debug t
+      pushbullet-api-debug t)
 #+END_SRC
 
 * Usage
 
 ** Interactive Commands
 
-| Command                    | Description                    | Key Binding |
-|----------------------------|--------------------------------|-------------|
-| =M-x pushbullet=          | Open the Pushbullet Buffer  | -           |
-| =M-x pushbullet-send=     | Send a note with prompted title and text | - |
-| =M-x pushbullet-send-text=| Send a note with prompted text  | -           |
-| =M-x pushbullet-region=   | Send the current region        | -           |
-| =M-x pushbullet-yank=     | Send clipboard contents        | -           |
-| =M-x pushbullet-update=   | Update the Pushbullet buffer | =C-c C-u=   |
+| Command                    | Description                                                          |
+|----------------------------+----------------------------------------------------------------------+
+| =M-x pushbullet=           | Opens or switches to the main Pushbullet UI buffer.                  |
+| =M-x pushbullet-send=      | Prompts for a title and text to send a new note push.                |
+| =M-x pushbullet-send-text= | Prompts for text to send a new note push, using a default title.     |
+| =M-x pushbullet-region=    | Sends the active region's content as a note push.                    |
+| =M-x pushbullet-yank=      | Sends the latest kill-ring entry (clipboard content) as a note push. |
+| =M-x pushbullet-export=    | Exports currently fetched pushes to an Org-mode buffer.              |
 
 ** Key Bindings in Pushbullet Buffer
 
-| Key      | Function           |
-|----------|--------------------|
-| =C-c C-c=| Send a new push     |
-| =C-c C-u=| Update/refresh the buffer |
-| =q=      | Quit the buffer    |
+| Key       | Function                                   |
+|-----------|--------------------------------------------|
+| =C-c C-e= | Export pushes to Org-mode.                 |
+| =C-c C-u= | Fetch more pushes.                         |
+| =C-c C-o= | Open a URL at the current cursor position. |
+| =q=       | Close the Pushbullet buffer.               |
 
 ** Examples
 
@@ -119,50 +121,58 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 
 * API Reference
 
-** Functions
-
-*** =pushbullet-send (title body)=
-Send a note to Pushbullet with the specified title and body text.
-
-*** =pushbullet-send-text (text)=
-Send a note with the default title and specified text.
-
-*** =pushbullet-region (start end)=
-Push the selected region to Pushbullet. The buffer name is used as the title.
-
-*** =pushbullet-yank ()=
-Push the current kill-ring (clipboard) contents to Pushbullet.
-
-*** =pushbullet ()=
-Open the interactive Pushbullet UI buffer.
-
-*** =pushbullet-update ()=
-Fetch and display the latest pushes in the current buffer.
-
 ** Customization Variables
 
-*** =pushbullet-token=
+*** =pushbullet-api-token=
 Your Pushbullet API access token (required).
 
-*** =pushbullet-limit=
-Number of pushes to fetch per request (default: 50).
+*** =pushbullet-api-limit=
+Number of pushes to fetch per request (default: =20=).
 
 *** =pushbullet-default-title=
-Default title for pushes (default: "GNU Emacs <version>").
+Default title for pushes (default: ="GNU Emacs <version>"=).
 
 *** =pushbullet-columns=
-Maximum columns for text wrapping (default: 108).
+Maximum columns for text wrapping (default: =70=).
+
+*** =pushbullet-show-send-forms=
+Whether to display the send form in the Pushbullet UI, or not (default: =t=).
 
 *** =pushbullet-debug=
-Enable debug logging (default: nil).
+Enable debug logging (default: =nil=).
+
+*** =pushbullet-api-debug=
+Enable debug logging for the API requests (default: =nil=).
+
+
+** Interactive Functions
+
+*** =(pushbullet)=
+Open the Pushbullet application buffer.
+
+*** =(pushbullet-send title body &optional url)=
+Send a note to Pushbullet using the given title, message body, and, optionally, a URL.
+
+*** =(pushbullet-send-text text)=
+Send a note with the default title and specified text.
+
+*** =(pushbullet-region start end)=
+Push the selected region to Pushbullet. The buffer name is used as the title.
+
+*** =(pushbullet-yank)=
+Push the current kill-ring (clipboard) contents to Pushbullet.
+
+*** =(pushbullet-export)=
+Export the list of Pushes to Org-Mode.
 
 * Dependencies
 
-This package requires the following Emacs packages:
+This package requires the following packages:
 - =emacs= ~(>= 29.1)~
-- =request= ~(>= 0.3.3)~
 - =all-the-icons= ~(>= 5.0.0)~
-- =auth-source= ~(>= 23.1)~
+- =request= ~(>= 0.3.3)~
+- =json= ~(>= 1.5)~
+- =auth-source= ~(>= 2.3.1)~
 
 * License
 
@@ -170,9 +180,15 @@ This project is licensed under the GNU General Public License v3.0 - see the [[f
 
 * Version
 
-Current version: 1.0.0
+Current version: 1.0.1
 
 * Changelog
+
+** 1.0.1
+- New UI with new features and a form for submitting pushes
+- Deletion of a single push or all pushes at once
+- Export pushes to Org-Mode
+- Show image and files URLs
 
 ** 1.0.0
 - Initial release
