@@ -240,7 +240,7 @@ title, URL, and body, and 'Delete' buttons."
                                        (alist-get 'image_url push)
                                        (alist-get 'file_url push)
                                        "")))
-         (_ (pushbullet--insert-aligned "Body: "))
+         (_ (pushbullet--insert-aligned "Text: "))
          (body-w (widget-create 'text
                                 :size pushbullet-textfield-width
                                 :format "%v"
@@ -280,7 +280,7 @@ Includes a 'Push' button to submit the form via the `send' callback from
                    'editable-field
                    :size pushbullet-textfield-width
                    :value ""))
-         (_ (pushbullet--insert-aligned "Body: "))
+         (_ (pushbullet--insert-aligned "Text: "))
          (new-body (widget-create
                     'editable-field
                     :size pushbullet-textfield-width
