@@ -41,43 +41,39 @@
 
 (defcustom pushbullet-api-token nil
   "Your personal Pushbullet API access token.
-This token is required for authentication with the Pushbullet API. You
-can obtain your access token from the Pushbullet account settings page:
+This token is required for authentication with the Pushbullet API.
+You can obtain your access token from the Pushbullet account settings page:
 `https://www.pushbullet.com/#settings/account`."
   :type 'string
   :group 'pushbullet-api)
 
 (defcustom pushbullet-api-limit 20
-  "The maximum number of pushes to fetch in a single API request for
- pagination."
+  "The maximum number of pushes to fetch in a single API request for pagination."
   :type 'integer
   :group 'pushbullet-api)
 
 (defcustom pushbullet-api-debug nil
-   "Enable verbose logging for Pushbullet API operations.
+  "Enable verbose logging for Pushbullet API operations.
 When non-nil, additional debug messages will be printed to the *Messages* buffer."
-   :type 'boolean
-   :group 'pushbullet-api)
+  :type 'boolean
+  :group 'pushbullet-api)
 
 (defvar pushbullet-api-url "https://api.pushbullet.com/v2"
-   "The base URL for all Pushbullet API v2 endpoints.")
+  "The base URL for all Pushbullet API v2 endpoints.")
 
 (defvar-local pushbullet-api-cursor nil
-   "A buffer-local string used for pagination in Pushbullet API requests,
- indicating the point from which to fetch subsequent pushes.")
+  "A buffer-local string used for pagination in Pushbullet API requests, indicating the point from which to fetch subsequent pushes.")
 
 (defmacro pushbullet-api--log (fmt &rest args)
-  "Log a debug message with FMT and ARGS when `pushbullet-debug' is
- enabled.
-The message is prefixed with '[pushbullet]' for identification."
+  "Logs a debug message with FMT and ARGS when `pushbullet-api-debug' is enabled.
+The message is prefixed with '[pushbullet-api]' for identification."
   `(when pushbullet-api-debug
      (message (concat "[pushbullet-api] " ,fmt) ,@args)))
 
 (defun pushbullet-api--check-token ()
-  "Ensures that the `pushbullet-api-token' is set, either directly or by
- retrieving it from `auth-source'.
-If the token is not found, an error is signaled prompting the user to
-set it."
+  "Ensures that `pushbullet-api-token' is set, either directly or by
+retrieving it from `auth-source'.
+If the token is not found, an error is signaled, prompting the user to set it."
   pushbullet-api-token
   (unless pushbullet-api-token
     (let ((auth-source-token (auth-source-pick-first-password :host "pushbullet.com")))
@@ -90,13 +86,12 @@ set it."
   "Makes an asynchronous HTTP request to the Pushbullet API.
 
 METHOD is a string representing the HTTP method (e.g., 'GET', 'POST', 'DELETE').
-ENDPOINT is a string specifying the API endpoint relative to `pushbullet-api-url`.
+ENDPOINT is a string specifying the API endpoint relative to `pushbullet-api-url'.
 DATA is an optional alist of request data to be sent as JSON.
-CALLBACK is a function to be called upon successful API response, receiving the parsed JSON data.
+CALLBACK is a function to be called upon a successful API response, receiving the parsed JSON data.
 ERROR-CALLBACK is an optional function to be called if the API request encounters an error.
 
-This function automatically includes the `pushbullet-api-token' for
-authentication and handles JSON encoding/decoding."
+This function automatically includes `pushbullet-api-token' for authentication and handles JSON encoding/decoding."
   (pushbullet-api--check-token)
   (let ((url (concat pushbullet-api-url endpoint))
         (headers `(("Access-Token" . ,pushbullet-api-token)
@@ -114,19 +109,18 @@ authentication and handles JSON encoding/decoding."
 
 (defun pushbullet-api--fetch-url (&optional limit)
   "Constructs the API endpoint for fetching pushes, incorporating
- `CURSOR' for pagination.
-If CURSOR is `nil', it fetches the initial set of pushes. Otherwise, it
-fetches subsequent pushes using the provided CURSOR value and
-`pushbullet-api-limit`.
-Then the optional argument LIMIT is provided, fetch at most LIMIT items."
+`pushbullet-api-cursor' for pagination.
+If `pushbullet-api-cursor' is `nil', it fetches the initial set of pushes.
+Otherwise, it fetches subsequent pushes using the provided
+`pushbullet-api-cursor' value and `pushbullet-api-limit'.
+If the optional argument LIMIT is provided, it fetches at most LIMIT items."
   (let* ((n (or limit pushbullet-api-limit)))
     (if pushbullet-api-cursor
         (format "/pushes?limit=%d&cursor=%s" n pushbullet-api-cursor)
       (format "/pushes?limit=%d" n))))
 
 (defun pushbullet-api-active (push)
-  "Returns true if PUSH has data and should be displayed. Returns `nil'
- otherwise."
+  "Returns true if PUSH has data and should be displayed; otherwise, returns `nil`."
   (let* ((active (alist-get 'active push))
          (title (alist-get 'title push))
          (url (alist-get 'url push))
@@ -138,11 +132,10 @@ Then the optional argument LIMIT is provided, fetch at most LIMIT items."
 
 (defun pushbullet-api-fetch (callback &optional limit)
   "Fetches Pushbullet pushes from the API.
-It uses `pushbullet-api-cursor' for pagination to fetch subsequent sets of
-pushes. Upon successful retrieval, the fetched pushes are filtered,
-`pushbullet-api-cursor' is updated, and CALLBACK is invoked with the
-filtered pushes. When optional argument LIIMIT is provided, fetch at
-most LIMIT items."
+It uses `pushbullet-api-cursor' for pagination to fetch subsequent sets of pushes.
+Upon successful retrieval, the fetched pushes are filtered,
+`pushbullet-api-cursor' is updated, and CALLBACK is invoked with the filtered pushes.
+If the optional argument LIMIT is provided, fetches at most LIMIT items."
   (pushbullet-api-request
    "GET" (pushbullet-api--fetch-url limit) nil
    (cl-function
@@ -154,10 +147,8 @@ most LIMIT items."
         (funcall callback (cl-coerce pushes 'list)))))))
 
 (defun pushbullet-api-delete (push)
-  "Deletes the specified PUSH (an alist containing at least an 'iden
- field) from the Pushbullet server.
-Upon successful deletion, a debug message is logged, and the Pushbullet
-UI is implicitly refreshed by `pushbullet` being called."
+  "Deletes the specified PUSH (an alist containing at least an 'iden field) from the Pushbullet server.
+Upon successful deletion, a debug message is logged, and the Pushbullet UI is implicitly refreshed by `pushbullet` being called."
   (let ((id (alist-get 'iden push)))
     (pushbullet-api-request
      "DELETE" (format "/pushes/%s" id) nil
@@ -166,6 +157,12 @@ UI is implicitly refreshed by `pushbullet` being called."
         (pushbullet-api--log "Push deleted: %S" push))))))
 
 (defun pushbullet-api-send (title body &optional url)
+  "Sends a push to the Pushbullet API.
+
+TITLE is a string specifying the title of the push.
+BODY is a string specifying the main content of the push.
+URL is an optional string specifying a URL to be included, transforming
+the push into a link."
   (let ((push `((type . ,"note")
                 (title . ,title)
                 (body . ,body))))
