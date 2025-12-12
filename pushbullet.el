@@ -478,6 +478,7 @@ This function is interactive."
         (setq
          pushbullet--title (format "Pushbullet %s" pushbullet-version)
          pushbullet--buffer buffer
+         pushbullet--pushes nil
          pushbullet-api-cursor nil))))
   (pushbullet--load-more)
   (switch-to-buffer-other-window (get-buffer pushbullet-buffer-name))
