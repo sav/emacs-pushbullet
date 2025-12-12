@@ -235,7 +235,11 @@ title, URL, and body, and 'Delete' buttons."
          (url-w (widget-create 'editable-field
                                :size pushbullet-textfield-width
                                :format "%v"
-                               :value (or (alist-get 'url push) "")))
+                               :value (or
+                                       (alist-get 'url push)
+                                       (alist-get 'image_url push)
+                                       (alist-get 'file_url push)
+                                       "")))
          (_ (pushbullet--insert-aligned "Body: "))
          (body-w (widget-create 'text
                                 :size pushbullet-textfield-width
