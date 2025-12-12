@@ -64,40 +64,36 @@
 When non-nil, additional debug messages will be printed to the
 *Messages* buffer."
   :type 'boolean
-  :group 'pushbullet
-  :initialize 'custom-initialize-default)
+  :group 'pushbullet)
 
 (defvar pushbullet-buffer-name "*Pushbullet*"
-  "The name of the main buffer where the Pushbullet user interface is
- displayed.")
+  "The name of the main buffer where the Pushbullet user interface is displayed.")
 
 (defvar pushbullet-export-buffer-name "*Pushbullet Export*"
-   "The name of the buffer used for exporting Pushbullet pushes to
- Org-mode format.")
+  "The name of the buffer used for exporting Pushbullet pushes to Org-mode format.")
 
 (defcustom pushbullet-default-title (format "GNU Emacs %s" emacs-version)
   "The default title string used for new pushes when no explicit title
- is provided.
-It is formatted to include the current Emacs version."
+ is provided. It is formatted to include the current Emacs version."
   :type 'string
   :group 'pushbullet)
 
 (defcustom pushbullet-columns 70
-  "Maximum number of columns for wrapping lines in the Pushbullet UI buffer."
+  "Maximum number of columns for wrapping lines in the Pushbullet UI  buffer."
   :type 'integer
   :group 'pushbullet)
 
 (defcustom pushbullet-left-alignment 8
-   "The size of the left alignment padding in the Pushbullet UI."
-   :type 'integer
-   :group 'pushbullet)
+  "The size of the left alignment padding in the Pushbullet UI."
+  :type 'integer
+  :group 'pushbullet)
 
 (defcustom pushbullet-textfield-width
-   (truncate
-       (* (- pushbullet-columns pushbullet-left-alignment) 0.90))
-   "The calculated width for editable text fields within the Pushbullet UI."
-   :type 'integer
-   :group 'pushbullet)
+  (truncate
+   (* (- pushbullet-columns pushbullet-left-alignment) 0.90))
+  "The calculated width for editable text fields within the Pushbullet UI."
+  :type 'integer
+  :group 'pushbullet)
 
 (defcustom pushbullet-show-send-form t
   "Whether to display the send form in the Pushbullet UI."
@@ -105,38 +101,37 @@ It is formatted to include the current Emacs version."
   :group 'pushbullet)
 
 (defvar pushbullet--buffer nil
-   "The buffer currently used for rendering the Pushbullet UI. This is a
+  "The buffer currently used for rendering the Pushbullet UI. This is a
  buffer-local variable.")
 
 (defvar pushbullet--title nil
-   "The title string displayed at the top of the Pushbullet UI buffer.
+  "The title string displayed at the top of the Pushbullet UI buffer.
  This is a buffer-local variable.")
 
 (defvar pushbullet--pushes nil
-   "A buffer-local list of Pushbullet pushes currently displayed in the
+  "A buffer-local list of Pushbullet pushes currently displayed in the
  UI, where each push is an alist.")
 
 (defmacro pushbullet--log (fmt &rest args)
-  "Logs a debug message with FMT and ARGS if `pushbullet-debug' is
- enabled.
-The message is prefixed with '[pushbullet]' for easy identification
-in the `*Messages*' buffer."
+  "Logs a debug message with FMT and ARGS if `pushbullet-debug' is enabled.
+The message is prefixed with '[pushbullet]' for easy identification in
+the `*Messages*' buffer."
   `(when pushbullet-debug
      (message (concat "[pushbullet] " ,fmt) ,@args)))
 
 (defun pushbullet--align-right (max str)
-   "Inserts spaces to right-align STR within a field of MAX width in the
+  "Inserts spaces to right-align STR within a field of MAX width in the
  current buffer."
-   (let ((len (length str)))
-       (when (>= max len)
-         (widget-insert (make-string (- max (length str)) ?\s)))))
+  (let ((len (length str)))
+    (when (>= max len)
+      (widget-insert (make-string (- max (length str)) ?\s)))))
 
 (defun pushbullet--insert-aligned (str)
-   "Inserts a newline and then the string STR, right-aligned by
- `pushbullet-left-alignment'."
-   (widget-insert "\n")
-   (pushbullet--align-right pushbullet-left-alignment str)
-   (widget-insert str))
+  "Inserts a newline and then the string STR, right-aligned by
+ `pushbullet-left-alignment`."
+  (widget-insert "\n")
+  (pushbullet--align-right pushbullet-left-alignment str)
+  (widget-insert str))
 
 (defun pushbullet--list-filter (pushes)
   "Filters a list of PUSHES, returning only those that are active and
@@ -144,19 +139,21 @@ in the `*Messages*' buffer."
   (seq-filter (lambda (push) (pushbullet-api-active push)) pushes))
 
 (defun pushbullet--list-remove (pushes push)
-  "Removes PUSH from LIST where elements in LIST match PUSH
- based on the `'iden' key-value pairs."
+  "Removes PUSH from PUSHES where elements in PUSHES match PUSH based on
+ the `'iden' key-value pairs."
   (let ((iden (alist-get 'iden push)))
     (seq-remove (lambda (item) (equal (alist-get 'iden item) iden)) pushes)))
 
 (defun pushbullet--send (title body url)
+  "Sends a push with TITLE, BODY, and URL, then reloads the UI."
   (pushbullet-api-send title body url)
   (pushbullet--log "Pushed: (%S, %S, %S)" title body url)
   (pushbullet--load-more 1))
 
 (defun pushbullet--load-more (&optional limit)
-  "Fetches additional pushes from the Pushbullet server using the `fetch'
- callback from `pushbullet--api', and then re-renders the UI."
+  "Fetches additional pushes from the Pushbullet server using the
+ `pushbullet-api-fetch' function, then re-renders the UI.
+If LIMIT is provided, fetches at most LIMIT pushes."
   (let ((fetch (alist-get 'fetch pushbullet--api)))
     (pushbullet-api-fetch
      #'(lambda (pushes)
@@ -175,23 +172,21 @@ in the `*Messages*' buffer."
   nil)
 
 (defun pushbullet--export-all ()
-  "Exports all currently loaded pushes to an Org-mode buffer using the
- `export' callback from `pushbullet--api'."
+  "Exports all currently loaded pushes to an Org-mode buffer using
+ `pushbullet-export'."
   (pushbullet-export pushbullet--pushes))
 
 (defun pushbullet--delete-all (&rest args)
   "Deletes all pushes currently displayed in the UI from the Pushbullet
- server using the `delete' callback from `pushbullet--api', then
- re-renders the UI."
+ server using `pushbullet-api-delete', then re-renders the UI."
   (dolist (push pushbullet--pushes)
     (pushbullet-api-delete push))
   (setq pushbullet--pushes nil)
   (pushbullet--render))
 
 (defun pushbullet--delete-row (push)
-  "Deletes a single PUSH from the `pushbullet--pushes' list, invokes
- the `delete' callback from `pushbullet--api', and then re-renders
- the UI."
+  "Deletes a single PUSH from `pushbullet--pushes', invokes
+ `pushbullet-api-delete', and then re-renders the UI."
   (setq pushbullet--pushes
         (pushbullet--list-remove pushbullet--pushes push))
   (pushbullet-api-delete push)
@@ -255,7 +250,7 @@ title, URL, and body, and 'Delete' buttons."
     (widget-insert "\n")))
 
 (defun pushbullet--render-pushes ()
-  "Render the list of pushes in the UI (`pushbullet-ai--pushes')."
+  "Renders the list of pushes in the UI (`pushbullet--pushes')."
   (dolist (push pushbullet--pushes)
     (when (pushbullet-api-active push)
       (pushbullet--render-push push))))
@@ -263,8 +258,7 @@ title, URL, and body, and 'Delete' buttons."
 (defun pushbullet--render-form ()
   "Renders the 'New Push' form, allowing users to input a title, URL,
  and body for a new Pushbullet push.
-Includes a 'Push' button to submit the form via the `send' callback from
-`pushbullet--api'."
+Includes a 'Push' button to submit the form via `pushbullet--send'."
   (widget-insert
    (propertize
     (concat "\n\n\n══ New Push "
@@ -357,12 +351,12 @@ Each active push is formatted as an Org-mode heading, including its
 title, URL (if present), and body.
 
 If PUSHES is `nil` or the function is called interactively, it exports
-the currently displayed pushes from the UI (`pushbullet-ui--pushes`).
+the currently displayed pushes from the UI (`pushbullet--pushes').
 
 This function is interactive."
   (interactive)
   (let ((buffer (get-buffer-create pushbullet-export-buffer-name))
-    	(pushes (or pushes pushbullet-ui--pushes)))
+    	(pushes (or pushes pushbullet--pushes)))
     (with-current-buffer buffer
       (remove-overlays)
       (erase-buffer)
@@ -437,7 +431,8 @@ selected."
 The kill-ring content is used as the body, and the title is set to
 `pushbullet-default-title'.
 
-This function is interactive and will signal an error if the kill-ring is empty."
+This function is interactive and will signal an error if the kill-ring
+is empty."
   (interactive)
   (let ((text (current-kill 0)))
     (unless text
