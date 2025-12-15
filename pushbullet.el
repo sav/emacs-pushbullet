@@ -206,92 +206,104 @@ If LIMIT is provided, fetches at most LIMIT pushes."
        "\n")
       'face 'bold))))
 
-(defun pushbullet--render-push (push)
-  "Renders a single PUSH (an alist) as a set of editable widgets in the UI.
-This includes displaying its creation datetime, editable fields for
-title, URL, and body, and 'Delete' buttons."
-  (let* ((created (seconds-to-time (alist-get 'created push)))
-         (datetime (propertize
-                    (format "%s %s  %s %s"
-                            (all-the-icons-faicon "calendar")
-                            (format-time-string "%Y-%b-%d" created)
-                            (all-the-icons-faicon "clock-o")
-                            (format-time-string "%H:%M" created))
-                    'face 'shadow))
-         (_ (widget-insert (format "\n ── %s " datetime)))
-         (_ (widget-insert (make-string
-                            (- pushbullet-columns
-                               (+ 7 (length datetime))) ?─) "\n"))
-         (_ (pushbullet--insert-aligned "Title: "))
-         (title-w (widget-create 'editable-field
-                                 :size pushbullet-textfield-width
-                                 :format "%v"
-                                 :value (or (alist-get 'title push) "")))
-         (_ (pushbullet--insert-aligned "URL: "))
-         (url-w (widget-create 'editable-field
-                               :size pushbullet-textfield-width
-                               :format "%v"
-                               :value (or
-                                       (alist-get 'url push)
-                                       (alist-get 'image_url push)
-                                       (alist-get 'file_url push)
-                                       "")))
-         (_ (pushbullet--insert-aligned "Text: "))
-         (body-w (widget-create 'text
-                                :size pushbullet-textfield-width
-                                :format "%v"
-                                :value (or (alist-get 'body push) ""))))
-    (widget-insert "\n\n")
-    (pushbullet--align-right pushbullet-columns "[Delete]")
-    (widget-create 'push-button
-                   :notify
-                   (lambda (&rest _)
-                     (pushbullet--delete-row push))
-                   "Delete")
-    (widget-insert "\n")))
-
 (defun pushbullet--render-pushes ()
   "Renders the list of pushes in the UI (`pushbullet--pushes')."
   (dolist (push pushbullet--pushes)
     (when (pushbullet-api-active push)
       (pushbullet--render-push push))))
 
-(defun pushbullet--render-form ()
-  "Renders the 'New Push' form, allowing users to input a title, URL,
- and body for a new Pushbullet push.
-Includes a 'Push' button to submit the form via `pushbullet--send'."
-  (widget-insert
-   (propertize
-    (concat "\n\n\n══ New Push "
-            (make-string (- pushbullet-columns 12) ?═) " \n")
-    'face 'bold))
-  (pushbullet--insert-aligned "Title: ")
-  (let* ((new-title (widget-create
-                     'editable-field
-                     :size pushbullet-textfield-width
-                     :value ""))
-         (_ (pushbullet--insert-aligned "URL: "))
-         (new-url (widget-create
-                   'editable-field
-                   :size pushbullet-textfield-width
-                   :value ""))
-         (_ (pushbullet--insert-aligned "Text: "))
-         (new-body (widget-create
-                    'editable-field
-                    :size pushbullet-textfield-width
-                    :value "")))
+(defun pushbullet--render-layout (layout)
+  "recursively renders a UI LAYOUT definition.
+LAYOUT is a list where each element is a form `(FUNCTION . ARGS)'.
+Strings in the list are treated as `(widget-insert STRING)`.
+Lambdas are executed directly."
+  (mapc (lambda (form)
+          (cond
+           ((stringp form)
+            (widget-insert form))
+           ((functionp form)
+            (funcall form))
+           ((consp form)
+            (apply (car form) (cdr form)))))
+        layout))
 
-    (widget-insert "\n\n")
-    (widget-insert (make-string pushbullet-columns ?═) "\n")
-    (pushbullet--align-right pushbullet-columns " Push ")
-    (widget-create 'push-button
-                   :notify (lambda (&rest _)
-                             (pushbullet--send
-                              (widget-value new-title)
-                              (widget-value new-body)
-                              (widget-value new-url)))
-                   "Push")
-    (widget-insert "\n")))
+(defun pushbullet--render-push (push)
+  "Renders a single PUSH (an alist) as a set of editable widgets in the UI.
+Uses a functional data structure to define the visual layout."
+  (let* ((created (seconds-to-time (alist-get 'created push)))
+         (fmt-date (lambda (icon fmt)
+                     (concat (all-the-icons-faicon icon) " "
+                             (format-time-string fmt created))))
+         (datetime (propertize
+                    (format "%s  %s"
+                            (funcall fmt-date "calendar" "%Y-%b-%d")
+                            (funcall fmt-date "clock-o" "%H:%M"))
+                    'face 'shadow))
+         (separator (make-string (- pushbullet-columns
+                                    (+ 7 (length datetime))) ?─))
+         (get-val (lambda (k) (or (alist-get k push) ""))))
+    (pushbullet--render-layout
+     `((widget-insert ,(format "\n ── %s " datetime))
+       (widget-insert ,(concat separator "\n"))
+       (pushbullet--insert-aligned "Title: ")
+       (widget-create editable-field
+                      :size ,pushbullet-textfield-width
+                      :format "%v"
+                      :value ,(funcall get-val 'title))
+       (pushbullet--insert-aligned "URL: ")
+       (widget-create editable-field
+                      :size ,pushbullet-textfield-width
+                      :format "%v"
+                      :value ,(or (alist-get 'url push)
+                                  (alist-get 'image_url push)
+                                  (alist-get 'file_url push)
+                                  ""))
+       (pushbullet--insert-aligned "Text: ")
+       (widget-create text
+                      :size ,pushbullet-textfield-width
+                      :format "%v"
+                      :value ,(funcall get-val 'body))
+       (widget-insert "\n\n")
+       (pushbullet--align-right ,pushbullet-columns "[Delete]")
+       (widget-create push-button
+                      :notify ,(lambda (&rest _) (pushbullet--delete-row push))
+                      "Delete")
+       (widget-insert "\n")))))
+
+(defun pushbullet--render-form ()
+  "Renders the 'New Push' form using a functional layout definition.
+Captures widget references in a closure for the Push action."
+  (let ((header (propertize
+                 (concat "\n\n\n══ New Push "
+                         (make-string (- pushbullet-columns 12) ?═) " \n")
+                 'face 'bold))
+        (w-title nil)
+        (w-url   nil)
+        (w-body  nil))
+    (pushbullet--render-layout
+     `((widget-insert ,header)
+       (pushbullet--insert-aligned "Title: ")
+       ,(lambda () (setq w-title (widget-create 'editable-field
+                                                :size pushbullet-textfield-width
+                                                :value "")))
+       (pushbullet--insert-aligned "URL: ")
+       ,(lambda () (setq w-url (widget-create 'editable-field
+                                              :size pushbullet-textfield-width
+                                              :value "")))
+       (pushbullet--insert-aligned "Text: ")
+       ,(lambda () (setq w-body (widget-create 'editable-field
+                                               :size pushbullet-textfield-width
+                                               :value "")))
+       (widget-insert "\n\n")
+       (widget-insert ,(concat (make-string pushbullet-columns ?═) "\n"))
+       (pushbullet--align-right ,pushbullet-columns " Push ")
+       (widget-create push-button
+                      :notify ,(lambda (&rest _)
+                                 (pushbullet--send (widget-value w-title)
+                                                   (widget-value w-body)
+                                                   (widget-value w-url)))
+                      "Push")
+       (widget-insert "\n")))))
 
 (defun pushbullet--render-bottom ()
   "Renders the bottom section of the Pushbullet UI, including action
