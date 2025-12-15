@@ -154,26 +154,27 @@ the `*Messages*' buffer."
   "Fetches additional pushes from the Pushbullet server using the
  `pushbullet-api-fetch' function, then re-renders the UI.
 If LIMIT is provided, fetches at most LIMIT pushes."
-  (let ((fetch (alist-get 'fetch pushbullet--api)))
-    (pushbullet-api-fetch
-     #'(lambda (pushes)
-         (setq pushbullet--pushes
-               (pushbullet--list-filter
-                (append pushbullet--pushes pushes)))
-         (pushbullet--log "Loaded more %S pushes. Total: %S"
-                          (length pushes) (length pushbullet--pushes))
-         (pushbullet--render)
-         ;; Move cursor back to its original position when called from
-         ;; "Load More" button.
-         (when (not limit)
-           (goto-char (point-max))
-           (search-backward "Load More")))
-     limit))
+  (interactive)
+  (pushbullet-api-fetch
+   #'(lambda (pushes)
+       (setq pushbullet--pushes
+             (pushbullet--list-filter
+              (append pushbullet--pushes pushes)))
+       (pushbullet--log "Loaded more %S pushes. Total: %S"
+                        (length pushes) (length pushbullet--pushes))
+       (pushbullet--render)
+       ;; Move cursor back to its original position when called from
+       ;; "Load More" button.
+       (when (not limit)
+         (goto-char (point-max))
+         (search-backward "Load More")))
+   limit)
   nil)
 
 (defun pushbullet--export-all ()
   "Exports all currently loaded pushes to an Org-mode buffer using
  `pushbullet-export'."
+  (interactive)
   (pushbullet-export pushbullet--pushes))
 
 (defun pushbullet--delete-all (&rest args)
