@@ -171,12 +171,6 @@ If LIMIT is provided, fetches at most LIMIT pushes."
    limit)
   nil)
 
-(defun pushbullet--export-all ()
-  "Exports all currently loaded pushes to an Org-mode buffer using
- `pushbullet-export'."
-  (interactive)
-  (pushbullet-export pushbullet--pushes))
-
 (defun pushbullet--delete-all (&rest args)
   "Deletes all pushes currently displayed in the UI from the Pushbullet
  server using `pushbullet-api-delete', then re-renders the UI."
@@ -317,7 +311,7 @@ Captures widget references in a closure for the Push action."
                  "Load More")
   (widget-insert " ")
   (widget-create 'push-button
-                 :notify (lambda (&rest _) (pushbullet--export-all))
+                 :notify (lambda (&rest _) (pushbullet-export))
                  "Export")
   (widget-insert " ")
   (widget-create 'push-button
@@ -454,7 +448,7 @@ is empty."
 
 (defconst pushbullet-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-e") #'pushbullet--export-all)
+    (define-key map (kbd "C-c C-e") #'pushbullet-export)
     (define-key map (kbd "C-c C-u") #'pushbullet--load-more)
     (define-key map (kbd "C-c C-o") #'browse-url-at-point)
     (define-key map (kbd "q") #'quit-window)
