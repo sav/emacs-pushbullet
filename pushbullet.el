@@ -399,7 +399,8 @@ the push into a link.
 This function is interactive, prompting the user for TITLE and BODY if
 called without arguments."
   (interactive "sTitle: \nsText: ")
-  (pushbullet-api-send title body url))
+  (pushbullet-api-send title body url)
+  (message "Sent: [%s] %s" title body))
 
 ;;;###autoload
 (defun pushbullet-send-text (text)

@@ -4,27 +4,14 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 
 * Features
 
-- Interactive UI: Browse and manage your pushes in a dedicated Emacs buffer
-- Send Notes: Send text notes to Pushbullet with custom titles
-- Region Pushing: Push selected text regions to your devices
-- Clipboard Integration: Send clipboard contents to Pushbullet
-- Pagination Support: Load multiple pages of pushes efficiently
-- Export Pushes to Org-Mode
+- *Interactive UI*: Browse and manage your pushes in a dedicated Emacs buffer
+- *Send Notes*: Send text notes to Pushbullet with custom titles
+- *Region Pushing*: Push selected text regions to your devices
+- *Clipboard Integration*: Send clipboard contents to Pushbullet
+- *Pagination Support*: Load multiple pages of pushes efficiently
+- *Export*: Export Pushes to Org-Mode
 
 * Installation
-
-** Manual Installation
-
-1. Clone this repository:
-   #+BEGIN_SRC bash
-   git clone https://github.com/sav/emacs-pushbullet.git
-   #+END_SRC
-
-2. Add the following to your =~/.emacs.d/init.el=:
-   #+BEGIN_SRC elisp
-   (add-to-list 'load-path "~/path/to/emacs-pushbullet")
-   (require 'pushbullet)
-   #+END_SRC
 
 ** Using straight.el
 
@@ -38,6 +25,19 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 #+BEGIN_SRC elisp
 (package! pushbullet :recipe (:host github :repo "sav/emacs-pushbullet"))
 #+END_SRC
+
+** Manual Installation
+
+1. Clone this repository:
+   #+BEGIN_SRC bash
+   git clone https://github.com/sav/emacs-pushbullet.git
+   #+END_SRC
+
+2. Add the following to your =~/.emacs.d/init.el=:
+   #+BEGIN_SRC elisp
+   (add-to-list 'load-path "~/path/to/emacs-pushbullet")
+   (require 'pushbullet)
+   #+END_SRC
 
 * Configuration
 
@@ -54,9 +54,9 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
    Or use =M-x customize-variable RET pushbullet-api-token=
 
 3. Alternatively, just add an entry for `pushbullet.com` (lower-case) in your `.authinfo.gpg`:
-  #BEGIN_SRC authinfo
+  #+BEGIN_SRC authinfo
   machine pushbullet.com password "your-api-token-here"
-  #END_SRC
+  #+END_SRC
 
 ** Optional Configuration
 
@@ -92,12 +92,17 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 
 | Key       | Function                                   |
 |-----------|--------------------------------------------|
-| =C-c C-e= | Export pushes to Org-mode.                 |
 | =C-c C-u= | Fetch more pushes.                         |
+| =C-c C-e= | Export pushes to Org-mode.                 |
 | =C-c C-o= | Open a URL at the current cursor position. |
 | =q=       | Close the Pushbullet buffer.               |
 
 ** Examples
+
+*** Open the Interactive UI
+#+BEGIN_SRC elisp
+(pushbullet)  ; Opens the main Pushbullet buffer
+#+END_SRC
 
 *** Send a Quick Note
 #+BEGIN_SRC elisp
@@ -112,11 +117,6 @@ A comprehensive Pushbullet client for GNU Emacs that allows you to send and mana
 *** Send Clipboard Contents
 #+BEGIN_SRC elisp
 (pushbullet-yank)  ; Sends current kill-ring contents
-#+END_SRC
-
-*** Open the Interactive UI
-#+BEGIN_SRC elisp
-(pushbullet)  ; Opens the main Pushbullet buffer
 #+END_SRC
 
 * API Reference
@@ -136,7 +136,7 @@ Default title for pushes (default: ="GNU Emacs <version>"=).
 Maximum columns for text wrapping (default: =70=).
 
 *** =pushbullet-show-send-forms=
-Whether to display the send form in the Pushbullet UI, or not (default: =t=).
+Whether to display the send form in the Pushbullet UI (default: =t=).
 
 *** =pushbullet-debug=
 Enable debug logging (default: =nil=).
