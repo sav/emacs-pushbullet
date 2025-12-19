@@ -72,15 +72,9 @@ The message is prefixed with '[pushbullet-api]' for identification."
 
 (defun pushbullet-api--check-token ()
   "Ensures that `pushbullet-api-token' is set, either directly or by
-retrieving it from `auth-source'.
-If the token is not found, an error is signaled, prompting the user to set it."
-  pushbullet-api-token
-  (unless pushbullet-api-token
-    (let ((auth-source-token (auth-source-pick-first-password :host "pushbullet.com")))
-      (if auth-source-token
-          (setq pushbullet-api-token auth-source-token)
-        (error "Please set your Pushbullet token with M-x customize-variable RET pushbullet-api-token"))))
-  pushbullet-api-token)
+retrieving it from `auth-source'. If the token is not found, return `nil'."
+  (or (stringp pushbullet-api-token)
+      (setq pushbullet-api-token (auth-source-pick-first-password :host "pushbullet.com"))))
 
 (defun pushbullet-api-request (method endpoint data callback &optional error-callback)
   "Makes an asynchronous HTTP request to the Pushbullet API.
@@ -92,7 +86,8 @@ CALLBACK is a function to be called upon a successful API response, receiving th
 ERROR-CALLBACK is an optional function to be called if the API request encounters an error.
 
 This function automatically includes `pushbullet-api-token' for authentication and handles JSON encoding/decoding."
-  (pushbullet-api--check-token)
+  (unless (pushbullet-api--check-token)
+    (error "Please set your Pushbullet token with M-x customize-variable RET pushbullet-api-token"))
   (let ((url (concat pushbullet-api-url endpoint))
         (headers `(("Access-Token" . ,pushbullet-api-token)
                    ("Content-Type" . "application/json"))))
@@ -108,39 +103,66 @@ This function automatically includes `pushbullet-api-token' for authentication a
                     (message "Pushbullet API error: %s" error-thrown)))))))
 
 (defun pushbullet-api--fetch-url (&optional limit)
-  "Constructs the API endpoint for fetching pushes, incorporating
-`pushbullet-api-cursor' for pagination.
-If `pushbullet-api-cursor' is `nil', it fetches the initial set of pushes.
-Otherwise, it fetches subsequent pushes using the provided
-`pushbullet-api-cursor' value and `pushbullet-api-limit'.
-If the optional argument LIMIT is provided, it fetches at most LIMIT items."
-  (let* ((n (or limit pushbullet-api-limit)))
-    (if pushbullet-api-cursor
-        (format "/pushes?limit=%d&cursor=%s" n pushbullet-api-cursor)
-      (format "/pushes?limit=%d" n))))
+  "Construct API endpoint string for fetching pushes with pagination.
+
+Returns a string representing the Pushbullet API URL path.
+
+If `pushbullet-api-cursor' is nil, fetches initial pushes.
+Otherwise, uses cursor for pagination with `pushbullet-api-limit'.
+Optional LIMIT overrides the default limit.
+
+API documentation: https://docs.pushbullet.com/#list-pushes
+
+The endpoint returns a JSON object with structure:
+`((cursor . <string>)
+  (pushes . [((iden . <string>)
+              (type . <string>)
+              (title . <string>)
+              (body . <string>)
+              (created . <number>)
+              (modified . <number>)
+              (active . <boolean>)) ...]))"
+  (apply #'format
+	 (let ((n (or limit pushbullet-api-limit)))
+           (if pushbullet-api-cursor
+               `("/pushes?limit=%d&cursor=%s" ,n ,pushbullet-api-cursor)
+             `("/pushes?limit=%d" ,n)))))
 
 (defun pushbullet-api-active (push)
   "Returns true if PUSH has data and should be displayed; otherwise, returns `nil`."
-  (let* ((active (alist-get 'active push))
-         (title (alist-get 'title push))
-         (url (alist-get 'url push))
-         (body (alist-get 'body push)))
+  (let ((active (alist-get 'active push)))
     (and (and active (not (eq active :json-false)))
-         (or (not (string-empty-p title))
-             (not (string-empty-p url))
-             (not (string-empty-p body))))))
+         (or (not (string-empty-p (alist-get 'title push)))
+             (not (string-empty-p (alist-get 'url push)))
+             (not (string-empty-p (alist-get 'body push)))))))
+
 
 (defun pushbullet-api-fetch (callback &optional limit)
-  "Fetches Pushbullet pushes from the API.
-It uses `pushbullet-api-cursor' for pagination to fetch subsequent sets of pushes.
-Upon successful retrieval, the fetched pushes are filtered,
-`pushbullet-api-cursor' is updated, and CALLBACK is invoked with the filtered pushes.
-If the optional argument LIMIT is provided, fetches at most LIMIT items."
+  "Fetch Pushbullet pushes from the API and invoke CALLBACK with results.
+
+Returns nil (asynchronous operation).
+
+Uses `pushbullet-api-cursor' for pagination to fetch subsequent sets.
+Upon successful retrieval, updates `pushbullet-api-cursor' and invokes
+CALLBACK with a list of push alists.
+Optional LIMIT overrides the default number of items to fetch.
+
+API documentation: https://docs.pushbullet.com/#list-pushes
+
+CALLBACK receives a list of push alists with structure:
+`(((iden . <string>)
+   (type . <string>)
+   (title . <string>)
+   (body . <string>)
+   (created . <number>)
+   (modified . <number>)
+   (active . <boolean>))
+  ...)"
   (pushbullet-api-request
    "GET" (pushbullet-api--fetch-url limit) nil
    (cl-function
     (lambda (&key data &allow-other-keys)
-      (let* ((pushes (alist-get 'pushes data))
+      (let ((pushes (alist-get 'pushes data))
              (cursor (alist-get 'cursor data)))
         (pushbullet-api--log "Received %S pushes" (length pushes))
         (setq pushbullet-cursor cursor)
