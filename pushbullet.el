@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Savio Sena <savio.sena@gmail.com>
 
 ;; Author: Savio Sena <savio.sena@gmail.com>
-;; Version: 1.0.1
+;; Version: 1.0.2
 ;; Package-Requires: ((emacs "29.1") (all-the-icons "5.0.0"))
 ;; Keywords: pushbullet, client, tool, internet
 ;; URL: https://github.com/sav/emacs-pushbullet
@@ -50,7 +50,7 @@
 (require 'widget)
 (require 'pushbullet-api)
 
-(defconst pushbullet-version "1.0.1"
+(defconst pushbullet-version "1.0.2"
    "The current version string of the Pushbullet Emacs package.")
 
 (defgroup pushbullet nil

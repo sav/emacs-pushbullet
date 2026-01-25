@@ -3,7 +3,7 @@
 ;; Copyright (C) 2025 Savio Sena <savio.sena@gmail.com>
 
 ;; Author: Savio Sena <savio.sena@gmail.com>
-;; Version: 1.0.1
+;; Version: 1.0.2
 ;; Package-Requires: ((emacs "29.1") (json "1.5") (request "0.3.3"))
 ;; Keywords: pushbullet, client, tool, internet
 ;; URL: https://github.com/sav/emacs-pushbullet
